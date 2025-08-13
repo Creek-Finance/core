@@ -1,0 +1,27 @@
+[package]
+name = "Protocol"
+version = "0.0.1"
+published-at = "0x4434f5a3dcd1c7309465db2baf49bf4602c1ea5db73e9036d7e8ec7257f99045"
+
+[dependencies.Sui]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+rev = "testnet"
+
+[dependencies.Math]
+local = "../libs/math"
+
+[dependencies.X]
+local = "../libs/x"
+
+[dependencies.Whitelist]
+local = "../libs/whitelist"
+
+[dependencies.CoinDecimalsRegistry]
+local = "../libs/coin_decimals_registry"
+
+[dependencies.XOracle]
+local = "../sui_x_oracle/x_oracle"
+
+[addresses]
+protocol = "0x4434f5a3dcd1c7309465db2baf49bf4602c1ea5db73e9036d7e8ec7257f99045"

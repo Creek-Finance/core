@@ -1,0 +1,10 @@
+[package]
+name = "coin_xaum"
+version = "1.0.0"
+edition = "2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet" }
+
+[addresses]
+coin_xaum = "0x56ced0870e2274f24a447640fcf08f37b5b4e9f8113b56f78801312392b1061c" 
