@@ -1,9 +1,0 @@
-[package]
-name = "xaum_indicator"
-edition = "2024.beta" 
-
-[dependencies]
-Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "sui-contract-testnet" }
-
-[addresses]
-xaum_indicator = "0x0"

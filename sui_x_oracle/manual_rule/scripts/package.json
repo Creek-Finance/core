@@ -1,0 +1,21 @@
+{
+    "name": "oracle-x-demo-scripts",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "setup": "node setup-policy.mjs",
+        "init": "node init-feeds.mjs",
+        "update": "node update.mjs",
+        "query": "node query.mjs",
+        "update-and-query": "node update-and-query.mjs"
+    },
+    "dependencies": {
+        "@mysten/sui": "^1.37.1",
+        "@pythnetwork/pyth-sui-js": "^2.2.0",
+        "dotenv": "^16.4.5"
+    }
+}

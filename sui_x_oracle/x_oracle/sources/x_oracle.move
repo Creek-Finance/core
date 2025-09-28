@@ -1,6 +1,7 @@
 module x_oracle::x_oracle {
   use std::vector;
   use std::type_name::{TypeName, get};
+  use std::option;
   use sui::object::{Self, UID};
   use sui::table::{Self, Table};
   use sui::tx_context::{Self, TxContext};
@@ -22,6 +23,24 @@ module x_oracle::x_oracle {
     secondary_price_update_policy: PriceUpdatePolicy,
     prices: Table<TypeName, PriceFeed>,
     ema_prices: Table<TypeName, PriceFeed>,
+    gr_coin_type: option::Option<TypeName>,
+    // Cached GR indicator (EMA120 scaled to 9 decimals)
+    gr_indicator_value_u64: u64,
+    gr_indicator_last_updated: u64,
+    // XAUM coin type for special floor condition
+    xaum_coin_type: option::Option<TypeName>,
+    // Cached XAUM indicators used to compute GR (scaled to 9 decimals)
+    xaum_ema120_value_u64: u64,
+    xaum_ema90_value_u64: u64,
+    // Cached XAUM spot price (scaled to 9 decimals)
+    xaum_spot_value_u64: u64,
+    // Cached computed sValue (scaled to 9 decimals)
+    gr_svalue_u64: u64,
+    // Cached computed GR value (scaled to 9 decimals)
+    gr_computed_value_u64: u64,
+    // GR pricing parameters alpha/beta as fixed-point (scale 1e9, 0..1e9)
+    gr_alpha_fp: u64,
+    gr_beta_fp: u64,
   }
 
   struct XOraclePolicyCap has key, store {
@@ -29,6 +48,9 @@ module x_oracle::x_oracle {
     primary_price_update_policy_cap: PriceUpdatePolicyCap,
     secondary_price_update_policy_cap: PriceUpdatePolicyCap,
   }
+
+  /// Minimal capability to update GR indicator cache only
+  struct GrIndicatorCap has key, store { id: UID }
 
   struct XOraclePriceUpdateRequest<phantom T> {
     primary_price_update_request: PriceUpdateRequest<T>,
@@ -47,7 +69,105 @@ module x_oracle::x_oracle {
     init_rules_df_if_not_exist(&x_oracle_policy_cap, &mut x_oracle, ctx);
     transfer::share_object(x_oracle);
     transfer::transfer(x_oracle_policy_cap, tx_context::sender(ctx));
+    // Mint a dedicated GR indicator cap with least privilege
+    let gr_cap = GrIndicatorCap { id: object::new(ctx) };
+    transfer::transfer(gr_cap, tx_context::sender(ctx));
     package::claim_and_keep(otw, ctx);
+  }
+
+  // === GR indicator admin setter & getters ===
+
+  /// Set GR indicator value (u64 scaled to 9 decimals) and last updated time; gated by GrIndicatorCap
+  public fun set_gr_indicator(
+    self: &mut XOracle,
+    _cap: &GrIndicatorCap,
+    value_u64: u64,
+    updated_time_sec: u64,
+    _ctx: &mut TxContext,
+  ) {
+    // Monotonic timestamp and non-zero value
+    assert!(updated_time_sec >= self.gr_indicator_last_updated, 0);
+    assert!(value_u64 > 0, 0);
+    self.gr_indicator_value_u64 = value_u64;
+    self.gr_indicator_last_updated = updated_time_sec;
+  }
+
+  public fun gr_indicator_value(self: &XOracle): u64 { self.gr_indicator_value_u64 }
+  public fun gr_indicator_last_updated(self: &XOracle): u64 { self.gr_indicator_last_updated }
+
+  /// Configure which CoinType is treated as GR (stored as TypeName). Gated by policy cap.
+  public fun set_gr_coin_type<CoinType>(
+    self: &mut XOracle,
+    _cap: &XOraclePolicyCap,
+    _ctx: &mut TxContext,
+  ) {
+    self.gr_coin_type = option::some(get<CoinType>());
+  }
+
+  /// Configure which CoinType is treated as XAUM. Gated by policy cap.
+  public fun set_xaum_coin_type<CoinType>(
+    self: &mut XOracle,
+    _cap: &XOraclePolicyCap,
+    _ctx: &mut TxContext,
+  ) {
+    self.xaum_coin_type = option::some(get<CoinType>());
+  }
+
+  /// Set GR pricing parameters alpha/beta as fixed-point (scale 1e9, 0..1e9). Gated by policy cap.
+  public fun set_gr_formula_params(
+    self: &mut XOracle,
+    _cap: &XOraclePolicyCap,
+    alpha_fp: u64,
+    beta_fp: u64,
+  ) {
+    // 0..1e9 range (1e9 means 1.0)
+    assert!(alpha_fp <= 1_000_000_000, 0);
+    assert!(beta_fp  <= 1_000_000_000, 0);
+    self.gr_alpha_fp = alpha_fp;
+    self.gr_beta_fp = beta_fp;
+  }
+
+  /// Set GR indicators (EMA120 / EMA90), scaled to 9 decimals. Gated by GrIndicatorCap.
+  public fun set_gr_indicators(
+    self: &mut XOracle,
+    _cap: &GrIndicatorCap,
+    ema120_value_u64: u64,
+    ema90_value_u64: u64,
+    spot_value_u64: u64,
+    updated_time_sec: u64,
+    _ctx: &mut TxContext,
+  ) {
+    assert!(updated_time_sec >= self.gr_indicator_last_updated, 0);
+    self.gr_indicator_last_updated = updated_time_sec;
+    self.xaum_ema120_value_u64 = ema120_value_u64;
+    self.xaum_ema90_value_u64 = ema90_value_u64;
+    self.xaum_spot_value_u64 = spot_value_u64;
+
+    // compute theoretical GR pricing and cache
+    // sValue = α × EMA120 + (1-α) × [β × EMA90 + (1-β) × SpotPrice]
+    let scale: u128 = 1_000_000_000u128; // 1e9
+    let alpha_u128 = (self.gr_alpha_fp as u128);
+    let beta_u128 = (self.gr_beta_fp as u128);
+    let ema120_u128 = (ema120_value_u64 as u128);
+    let ema90_u128 = (ema90_value_u64 as u128);
+    let spot_u128 = (spot_value_u64 as u128);
+    let s_value: u128 = if (self.gr_alpha_fp <= 1_000_000_000 && self.gr_beta_fp <= 1_000_000_000 && ema120_value_u64 > 0 && ema90_value_u64 > 0 && spot_value_u64 > 0) {
+      let inner_num = beta_u128 * ema90_u128 + (scale - beta_u128) * spot_u128;
+      let inner = inner_num / scale;
+      let s_num = alpha_u128 * ema120_u128 + (scale - alpha_u128) * inner;
+      let prelim: u128 = s_num / scale; // scaled 1e9
+      if (option::is_some(&self.xaum_coin_type)) {
+        let xaum_tn = *option::borrow(&self.xaum_coin_type);
+        if (table::contains(&self.prices, xaum_tn)) {
+          let xaum_pf = table::borrow(&self.prices, xaum_tn);
+          let xaum_val: u128 = ((price_feed::value(xaum_pf)) as u128);
+          if (xaum_val < prelim) { xaum_val } else { prelim }
+        } else { prelim }
+      } else { prelim }
+    } else { 0u128 };
+    self.gr_svalue_u64 = (s_value as u64);
+    let gr_u128 = if (s_value > 0u128) { s_value / (100 as u128) } else { 0u128 };
+    self.gr_computed_value_u64 = (gr_u128 as u64);
   }
 
   fun new(ctx: &mut TxContext): (XOracle, XOraclePolicyCap) {
@@ -59,6 +179,17 @@ module x_oracle::x_oracle {
       secondary_price_update_policy,
       prices: table::new(ctx),
       ema_prices: table::new(ctx),
+      gr_coin_type: option::none<TypeName>(),
+      gr_indicator_value_u64: 0,
+      gr_indicator_last_updated: 0,
+      xaum_coin_type: option::none<TypeName>(),
+      xaum_ema120_value_u64: 0,
+      xaum_ema90_value_u64: 0,
+      xaum_spot_value_u64: 0,
+      gr_svalue_u64: 0,
+      gr_computed_value_u64: 0,
+      gr_alpha_fp: 0,
+      gr_beta_fp: 0,
     };
     let x_oracle_update_policy = XOraclePolicyCap {
       id: object::new(ctx),
@@ -204,13 +335,13 @@ module x_oracle::x_oracle {
     };
     let price_feed = determine_price(primary_price_feeds, secondary_price_feeds);
 
-    let current_price_feed = table::borrow_mut(&mut self.prices, get<T>());
-
     let now = clock::timestamp_ms(clock) / 1000;
-    let new_price_feed = price_feed::new(
-      price_feed::value(&price_feed),
-      now
-    );
+    let selected_value_from_rule: u64 = price_feed::value(&price_feed);
+    let selected_value: u64 = if (option::is_some(&self.gr_coin_type) && coin_type == *option::borrow(&self.gr_coin_type) && self.gr_computed_value_u64 > 0) {
+      self.gr_computed_value_u64
+    } else { selected_value_from_rule };
+    let new_price_feed = price_feed::new(selected_value, now);
+    let current_price_feed = table::borrow_mut(&mut self.prices, get<T>());
     *current_price_feed = new_price_feed;
   }
 

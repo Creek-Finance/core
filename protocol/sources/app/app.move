@@ -1,29 +1,33 @@
 module protocol::app;
 
+use coin_gusd::coin_gusd::COIN_GUSD;
+use test_coin::coin_xaum::COIN_XAUM;
+use math::fixed_point32_empower;
 use protocol::error;
-use protocol::incentive_rewards;
 use protocol::interest_model::{Self, InterestModels, InterestModel};
 use protocol::limiter::{Self, LimiterUpdateParamsChange, LimiterUpdateLimitChange};
 use protocol::market::{Self, Market};
 use protocol::market_dynamic_keys::{
     Self,
     BorrowFeeKey,
-    BorrowFeeRecipientKey,
     SupplyLimitKey,
     BorrowLimitKey,
     IsolatedAssetKey
 };
 use protocol::obligation_access::{Self, ObligationAccessStore};
+use protocol::price as price_eval;
 use protocol::risk_model::{Self, RiskModels, RiskModel};
+use protocol::staking_manager::{Self as staking_manager, StakingManager};
 use std::fixed_point32::{Self, FixedPoint32};
 use std::type_name::{Self, TypeName};
 use sui::clock::{Self, Clock};
+use sui::coin::TreasuryCap;
 use sui::dynamic_field;
 use sui::event;
 use sui::package;
-use whitelist::whitelist;
 use x::ac_table::AcTableCap;
 use x::one_time_lock_value::OneTimeLockValue;
+use x_oracle::x_oracle::XOracle;
 
 /// OTW
 public struct APP has drop {}
@@ -35,6 +39,13 @@ public struct AdminCap has key, store {
     risk_model_cap: AcTableCap<RiskModels>,
     risk_model_change_delay: u64,
     limiter_change_delay: u64,
+    reward_address: address,
+}
+
+public struct RewardAddressUpdatedEvent has copy, drop {
+    old_address: address,
+    new_address: address,
+    sender: address,
 }
 
 public struct TakeRevenueEvent has copy, drop {
@@ -42,6 +53,7 @@ public struct TakeRevenueEvent has copy, drop {
     amount: u64,
     coin_type: TypeName,
     sender: address,
+    recipient: address,
 }
 
 public struct TakeBorrowFeeEvent has copy, drop {
@@ -49,6 +61,15 @@ public struct TakeBorrowFeeEvent has copy, drop {
     amount: u64,
     coin_type: TypeName,
     sender: address,
+    recipient: address,
+}
+
+public struct TakeStakingFeeEvent has copy, drop {
+    manager: ID,
+    amount: u64,
+    coin_type: TypeName,
+    sender: address,
+    recipient: address,
 }
 
 fun init(otw: APP, ctx: &mut TxContext) {
@@ -70,6 +91,7 @@ fun init_internal(otw: APP, ctx: &mut TxContext) {
         risk_model_cap,
         risk_model_change_delay: 0,
         limiter_change_delay: 0,
+        reward_address: @0x0,
     };
     package::claim_and_keep(otw, ctx);
     transfer::public_share_object(market);
@@ -90,24 +112,58 @@ public fun extend_limiter_change_delay(admin_cap: &mut AdminCap, delay: u64) {
     admin_cap.limiter_change_delay = admin_cap.limiter_change_delay + delay;
 }
 
+/// ===== Emergency pause controls =====
+/// Manually pause the protocol. Only admin can call.
+public entry fun pause_protocol(_admin_cap: &AdminCap, market: &mut Market) {
+    market::set_paused(market, true);
+}
+
+/// Manually resume the protocol. Only admin can call.
+public entry fun resume_protocol(_admin_cap: &AdminCap, market: &mut Market) {
+    market::set_paused(market, false);
+}
+
+/// Anyone can call. If GUSD price deviates from 1 by >= 0.8%, auto-pause protocol.
+/// Deviation threshold: 0.008
+public entry fun check_and_pause_if_gusd_depeg(
+    market: &mut Market,
+    x_oracle: &XOracle,
+    clock: &Clock,
+) {
+    if (market::is_paused(market)) { return }; // already paused
+
+    let price = price_eval::get_price(x_oracle, type_name::get<COIN_GUSD>(), clock);
+    let one = fixed_point32_empower::from_u64(1);
+    let diff = if (fixed_point32_empower::gt(price, one)) {
+        fixed_point32_empower::sub(price, one)
+    } else {
+        fixed_point32_empower::sub(one, price)
+    };
+    let tolerance = fixed_point32::create_from_rational(8, 1000); // 0.008
+
+    if (fixed_point32_empower::gte(diff, tolerance)) {
+        market::set_paused(market, true);
+    };
+}
+
+/// ===== Auto-pause configuration =====
+public entry fun set_auto_pause_enabled(_admin_cap: &AdminCap, market: &mut Market, enabled: bool) {
+    market::set_auto_pause_enabled(market, enabled);
+}
+
+public entry fun set_auto_pause_threshold(
+    _admin_cap: &AdminCap,
+    market: &mut Market,
+    numerator: u64,
+    denominator: u64,
+) {
+    let threshold = fixed_point32::create_from_rational(numerator, denominator);
+    market::set_auto_pause_threshold(market, threshold);
+}
+
 /// For extension of the protocol
 public fun ext(_: &AdminCap, market: &mut Market): &mut UID {
     market::uid_mut(market)
-}
-
-/// Add a whitelist address
-public fun add_whitelist_address(_: &AdminCap, market: &mut Market, address: address) {
-    whitelist::add_whitelist_address(
-        market::uid_mut(market),
-        address,
-    );
-}
-
-public fun remove_whitelist_address(_: &AdminCap, market: &mut Market, address: address) {
-    whitelist::remove_whitelist_address(
-        market::uid_mut(market),
-        address,
-    );
 }
 
 public fun create_interest_model_change<T>(
@@ -295,24 +351,6 @@ public entry fun apply_limiter_params_change<T>(
     );
 }
 
-// ====== incentive rewards =====
-public entry fun set_incentive_reward_factor<T>(
-    _admin_cap: &AdminCap,
-    market: &mut Market,
-    reward_factor: u64,
-    scale: u64,
-    _ctx: &mut TxContext,
-) {
-    let reward_factors = market::reward_factors_mut(market);
-    incentive_rewards::set_reward_factor<T>(reward_factors, reward_factor, scale);
-}
-
-// the final fee rate is "fee/10000"
-// When fee is 10, the final fee rate is 0.1%
-public entry fun set_flash_loan_fee<T>(_admin_cap: &AdminCap, market: &mut Market, fee: u64) {
-    market::set_flash_loan_fee<T>(market, fee);
-}
-
 /// ======= management of asset active state =======
 public entry fun set_base_asset_active_state<T>(
     _admin_cap: &AdminCap,
@@ -332,7 +370,7 @@ public entry fun set_collateral_active_state<T>(
 
 /// ======= take revenue =======
 public entry fun take_revenue<T>(
-    _admin_cap: &AdminCap,
+    admin_cap: &AdminCap,
     market: &mut Market,
     amount: u64,
     ctx: &mut TxContext,
@@ -342,15 +380,16 @@ public entry fun take_revenue<T>(
         amount,
         coin_type: type_name::get<T>(),
         sender: tx_context::sender(ctx),
+        recipient: admin_cap.reward_address,
     });
 
     let coin = market::take_revenue<T>(market, amount, ctx);
-    transfer::public_transfer(coin, tx_context::sender(ctx));
+    transfer::public_transfer(coin, admin_cap.reward_address);
 }
 
 /// ======= take borrow fee =======
 public entry fun take_borrow_fee<T>(
-    _admin_cap: &AdminCap,
+    admin_cap: &AdminCap,
     market: &mut Market,
     amount: u64,
     ctx: &mut TxContext,
@@ -360,10 +399,52 @@ public entry fun take_borrow_fee<T>(
         amount,
         coin_type: type_name::get<T>(),
         sender: tx_context::sender(ctx),
+        recipient: admin_cap.reward_address,
     });
 
     let coin = market::take_borrow_fee<T>(market, amount, ctx);
-    transfer::public_transfer(coin, tx_context::sender(ctx));
+    transfer::public_transfer(coin, admin_cap.reward_address);
+}
+
+/// ======= staking fee (XAUM) =======
+public entry fun update_staking_fee(
+    _admin_cap: &AdminCap,
+    manager: &mut StakingManager,
+    fee_numerator: u64,
+    fee_denominator: u64,
+    ctx: &mut TxContext,
+) {
+    assert!(fee_numerator <= fee_denominator, error::invalid_params_error());
+    staking_manager::update_stake_fee(manager, fee_numerator, fee_denominator, ctx);
+}
+
+public entry fun update_unstaking_fee(
+    _admin_cap: &AdminCap,
+    manager: &mut StakingManager,
+    fee_numerator: u64,
+    fee_denominator: u64,
+    ctx: &mut TxContext,
+) {
+    assert!(fee_numerator <= fee_denominator, error::invalid_params_error());
+    staking_manager::update_unstake_fee(manager, fee_numerator, fee_denominator, ctx);
+}
+
+public entry fun take_staking_fee(
+    admin_cap: &AdminCap,
+    manager: &mut StakingManager,
+    amount: u64,
+    ctx: &mut TxContext,
+) {
+    event::emit(TakeStakingFeeEvent {
+        manager: object::id(manager),
+        amount,
+        coin_type: type_name::get<COIN_XAUM>(),
+        sender: tx_context::sender(ctx),
+        recipient: admin_cap.reward_address,
+    });
+
+    let coin = staking_manager::take_stake_fee_coin(manager, amount, ctx);
+    transfer::public_transfer(coin, admin_cap.reward_address);
 }
 
 /// ======= Management of obligation access keys
@@ -411,30 +492,6 @@ public entry fun update_borrow_fee<T: drop>(
     dynamic_field::add(market_uid_mut, key, fee);
 }
 
-public entry fun update_borrow_fee_recipient(
-    _admin_cap: &AdminCap,
-    market: &mut Market,
-    recipient: address,
-) {
-    let market_uid_mut = market::uid_mut(market);
-    let key = market_dynamic_keys::borrow_fee_recipient_key();
-
-    dynamic_field::remove_if_exists<BorrowFeeRecipientKey, address>(market_uid_mut, key);
-    dynamic_field::add(market_uid_mut, key, recipient);
-}
-
-public entry fun update_supply_limit<T: drop>(
-    _admin_cap: &AdminCap,
-    market: &mut Market,
-    limit_amount: u64,
-) {
-    let market_uid_mut = market::uid_mut(market);
-    let key = market_dynamic_keys::supply_limit_key(type_name::get<T>());
-
-    dynamic_field::remove_if_exists<SupplyLimitKey, u64>(market_uid_mut, key);
-    dynamic_field::add(market_uid_mut, key, limit_amount);
-}
-
 public entry fun update_borrow_limit<T: drop>(
     _admin_cap: &AdminCap,
     market: &mut Market,
@@ -457,4 +514,38 @@ public entry fun update_isolated_asset_status<PoolType: drop>(
 
     dynamic_field::remove_if_exists<IsolatedAssetKey, bool>(market_uid_mut, key);
     dynamic_field::add(market_uid_mut, key, is_isolated);
+}
+
+public entry fun set_gusd_cap(
+    _admin_cap: &AdminCap,
+    market: &mut Market,
+    gusd_cap: TreasuryCap<COIN_GUSD>,
+) {
+    market::set_gusd_cap(market, gusd_cap);
+}
+
+public entry fun update_reward_address(
+    admin_cap: &mut AdminCap,
+    new_address: address,
+    ctx: &mut TxContext,
+) {
+    let old_address = admin_cap.reward_address;
+    admin_cap.reward_address = new_address;
+    event::emit(RewardAddressUpdatedEvent {
+        old_address,
+        new_address,
+        sender: tx_context::sender(ctx),
+    });
+}
+
+public entry fun transfer_admin_cap(admin_cap: AdminCap, new_admin: address) {
+    transfer::transfer(admin_cap, new_admin);
+}
+
+public entry fun set_flash_loan_single_cap(
+    _admin_cap: &AdminCap,
+    market: &mut Market,
+    single_cap: u64,
+) {
+    market::set_flash_loan_single_cap(market, single_cap);
 }

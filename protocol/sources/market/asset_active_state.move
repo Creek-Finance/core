@@ -1,7 +1,6 @@
 module protocol::asset_active_state;
 
 use std::type_name::TypeName;
-use sui::tx_context::TxContext;
 use x::wit_table::{Self, WitTable};
 
 public struct BaseAssetActiveStates has drop {}

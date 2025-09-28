@@ -1,0 +1,11 @@
+[package]
+name = "xaum_indicator_core"
+edition = "2024.beta"
+
+[dependencies]
+XOracle = { local = "../../sui_x_oracle/x_oracle" }
+
+[addresses]
+xaum_indicator_core = "0x0"
+
+

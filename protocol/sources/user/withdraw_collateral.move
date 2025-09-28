@@ -1,5 +1,5 @@
 /// @title Module for hanlding withdraw collateral request from user
-/// @author Scallop Labs
+/// @author Creek Labs
 /// @notice User can withdarw collateral as long as the obligation risk level is lower than 1
 module protocol::withdraw_collateral;
 
@@ -14,7 +14,6 @@ use sui::balance;
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
-use whitelist::whitelist;
 use x_oracle::x_oracle::XOracle;
 
 public struct CollateralWithdrawEvent has copy, drop {
@@ -46,6 +45,8 @@ public entry fun withdraw_collateral_entry<T>(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
     let withdrawedCoin = withdraw_collateral<T>(
         version,
         obligation,
@@ -84,14 +85,10 @@ public fun withdraw_collateral<T>(
     clock: &Clock,
     ctx: &mut TxContext,
 ): Coin<T> {
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
     // check version
     version::assert_current_version(version);
-
-    // check if sender is in whitelist
-    assert!(
-        whitelist::is_address_allowed(market::uid(market), tx_context::sender(ctx)),
-        error::whitelist_error(),
-    );
 
     // check if obligation is locked, if locked, unlock is required before calling this
     // This is a mechanism to enforce some actions before withdraw collateral

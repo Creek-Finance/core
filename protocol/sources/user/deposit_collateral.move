@@ -1,5 +1,5 @@
 /// @title A module dedicated for handling the collateral deposit request from user
-/// @author Scallop Labs
+/// @author Creek Labs
 module protocol::deposit_collateral;
 
 use protocol::error;
@@ -9,7 +9,6 @@ use protocol::version::{Self, Version};
 use std::type_name::{Self, TypeName};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
-use whitelist::whitelist;
 
 public struct CollateralDepositEvent has copy, drop {
     provider: address,
@@ -22,7 +21,7 @@ public struct CollateralDepositEvent has copy, drop {
 /// @dev There's a overall collateral limit in the protocol configs, since market contains the configs, so market is also involved here
 /// @param version The version control object, contract version must match with this
 /// @param obligation The obligation object to deposit collateral
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param market The Creek market object, it contains base assets, and related protocol configs
 /// @param coin The collateral to be deposited
 /// @param ctx The SUI transaction context object
 /// @custom:T The type of the collateral
@@ -35,11 +34,9 @@ public entry fun deposit_collateral<T>(
 ) {
     // check version
     version::assert_current_version(version);
-    // check if sender is in whitelist
-    assert!(
-        whitelist::is_address_allowed(market::uid(market), tx_context::sender(ctx)),
-        error::whitelist_error(),
-    );
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
+
     // check if obligation is locked, if locked, unlock operation is required before calling this function
     // This is a mechanism to enforce some operations before calling the function
     assert!(obligation::deposit_collateral_locked(obligation) == false, error::obligation_locked());

@@ -1,11 +1,11 @@
 module protocol::market;
 
+use coin_gusd::coin_gusd::{COIN_GUSD, mint};
 use math::fixed_point32_empower;
 use protocol::asset_active_state::{Self, AssetActiveStates};
 use protocol::borrow_dynamics::{Self, BorrowDynamics, BorrowDynamic};
 use protocol::collateral_stats::{Self, CollateralStats, CollateralStat};
 use protocol::error;
-use protocol::incentive_rewards::{Self, RewardFactors, RewardFactor};
 use protocol::interest_model::{Self, InterestModels, InterestModel};
 use protocol::limiter::{Self, Limiters, Limiter};
 use protocol::market_dynamic_keys::{Self, IsolatedAssetKey};
@@ -13,12 +13,10 @@ use protocol::reserve::{Self, Reserve, MarketCoin, FlashLoan};
 use protocol::risk_model::{Self, RiskModels, RiskModel};
 use std::fixed_point32;
 use std::type_name::{Self, TypeName, get};
-use std::vector;
-use sui::balance::Balance;
-use sui::coin::Coin;
+use sui::balance::{Self, Balance};
+use sui::coin::{Self, Coin, TreasuryCap};
 use sui::dynamic_field as df;
-use sui::object::{Self, UID};
-use sui::tx_context::TxContext;
+use sui::event;
 use x::ac_table::{Self, AcTable, AcTableCap};
 use x::wit_table::{Self, WitTable};
 use x::witness::Witness;
@@ -30,9 +28,23 @@ public struct Market has key, store {
     interest_models: AcTable<InterestModels, TypeName, InterestModel>,
     risk_models: AcTable<RiskModels, TypeName, RiskModel>,
     limiters: WitTable<Limiters, TypeName, Limiter>,
-    reward_factors: WitTable<RewardFactors, TypeName, RewardFactor>,
     asset_active_states: AssetActiveStates,
     vault: Reserve,
+    gusd_treasury_cap: Option<TreasuryCap<COIN_GUSD>>,
+    paused: bool,
+    auto_pause_enabled: bool,
+    auto_pause_threshold: fixed_point32::FixedPoint32,
+    flash_loan_single_cap: u64,
+}
+
+public struct MintEvent has copy, drop {
+    minter: address,
+    amount: u64,
+}
+
+public struct BurnEvent has copy, drop {
+    burner: address,
+    amount: u64,
 }
 
 public fun uid(market: &Market): &UID { &market.id }
@@ -53,10 +65,6 @@ public fun vault(market: &Market): &Reserve { &market.vault }
 
 public fun risk_models(market: &Market): &AcTable<RiskModels, TypeName, RiskModel> {
     &market.risk_models
-}
-
-public fun reward_factors(market: &Market): &WitTable<RewardFactors, TypeName, RewardFactor> {
-    &market.reward_factors
 }
 
 public fun collateral_stats(market: &Market): &WitTable<CollateralStats, TypeName, CollateralStat> {
@@ -81,10 +89,6 @@ public fun risk_model(self: &Market, type_name: TypeName): &RiskModel {
     ac_table::borrow(&self.risk_models, type_name)
 }
 
-public fun reward_factor(self: &Market, type_name: TypeName): &RewardFactor {
-    wit_table::borrow(&self.reward_factors, type_name)
-}
-
 public fun has_risk_model(self: &Market, type_name: TypeName): bool {
     ac_table::contains(&self.risk_models, type_name)
 }
@@ -99,6 +103,14 @@ public fun is_base_asset_active(self: &Market, type_name: TypeName): bool {
 
 public fun is_collateral_active(self: &Market, type_name: TypeName): bool {
     asset_active_state::is_collateral_active(&self.asset_active_states, type_name)
+}
+
+public fun is_paused(self: &Market): bool { self.paused }
+
+public fun auto_pause_enabled(self: &Market): bool { self.auto_pause_enabled }
+
+public fun auto_pause_threshold(self: &Market): fixed_point32::FixedPoint32 {
+    self.auto_pause_threshold
 }
 
 public fun is_isolated_asset(self: &Market, pool_type: TypeName): bool {
@@ -121,11 +133,20 @@ public(package) fun new(
         interest_models,
         risk_models,
         limiters: limiter::init_table(ctx),
-        reward_factors: incentive_rewards::init_table(ctx),
         asset_active_states: asset_active_state::new(ctx),
         vault: reserve::new(ctx),
+        gusd_treasury_cap: option::none<TreasuryCap<COIN_GUSD>>(),
+        paused: false,
+        auto_pause_enabled: true,
+        auto_pause_threshold: fixed_point32::create_from_rational(8, 1000), // 0.8%
+        flash_loan_single_cap: 50_000,
     };
     (market, interest_models_cap, risk_models_cap)
+}
+
+public(package) fun set_gusd_cap(self: &mut Market, cap: TreasuryCap<COIN_GUSD>) {
+    assert!(option::is_none(&self.gusd_treasury_cap), error::invalid_params_error());
+    option::fill(&mut self.gusd_treasury_cap, cap);
 }
 
 public(package) fun handle_outflow<T>(self: &mut Market, outflow_value: u64, now: u64) {
@@ -177,10 +198,6 @@ public(package) fun register_collateral<T>(self: &mut Market) {
     asset_active_state::set_collateral_active_state(&mut self.asset_active_states, type_name, true);
 }
 
-public(package) fun set_flash_loan_fee<T>(self: &mut Market, fee: u64) {
-    reserve::set_flash_loan_fee<T>(&mut self.vault, fee)
-}
-
 public(package) fun risk_models_mut(
     self: &mut Market,
 ): &mut AcTable<RiskModels, TypeName, RiskModel> {
@@ -199,22 +216,32 @@ public(package) fun rate_limiter_mut(
     &mut self.limiters
 }
 
-public(package) fun reward_factors_mut(
+public(package) fun set_paused(self: &mut Market, paused: bool) { self.paused = paused }
+
+public(package) fun set_auto_pause_enabled(self: &mut Market, enabled: bool) {
+    self.auto_pause_enabled = enabled
+}
+
+public(package) fun set_auto_pause_threshold(
     self: &mut Market,
-): &mut WitTable<RewardFactors, TypeName, RewardFactor> {
-    &mut self.reward_factors
+    threshold: fixed_point32::FixedPoint32,
+) {
+    self.auto_pause_threshold = threshold
 }
 
-public(package) fun handle_borrow<T>(self: &mut Market, borrow_amount: u64, now: u64): Balance<T> {
-    accrue_all_interests(self, now);
-    let borrowed_balance = reserve::handle_borrow<T>(&mut self.vault, borrow_amount);
-    update_interest_rates(self);
-    borrowed_balance
-}
-
-public(package) fun handle_repay<T>(self: &mut Market, balance: Balance<T>) {
-    reserve::handle_repay(&mut self.vault, balance);
-    update_interest_rates(self);
+public(package) fun handle_repay<T>(
+    self: &mut Market,
+    repay_coin: Coin<COIN_GUSD>,
+    ctx: &mut TxContext,
+) {
+    // Obtain the Coin of the debt portion that needs to be burn
+    let debt_balance = reserve::handle_repay<T>(&mut self.vault, repay_coin);
+    if (balance::value(&debt_balance) > 0) {
+        let debt_coin = coin::from_balance(debt_balance, ctx);
+        burn_gusd(self, debt_coin, ctx); // burn the debt portion
+    } else {
+        balance::destroy_zero(debt_balance);
+    };
 }
 
 public(package) fun handle_add_collateral<T>(self: &mut Market, collateral_amount: u64) {
@@ -235,57 +262,29 @@ public(package) fun handle_add_collateral<T>(self: &mut Market, collateral_amoun
 public(package) fun handle_withdraw_collateral<T>(self: &mut Market, amount: u64, now: u64) {
     accrue_all_interests(self, now);
     collateral_stats::decrease(&mut self.collateral_stats, get<T>(), amount);
-    update_interest_rates(self);
 }
 
-public(package) fun handle_liquidation<DebtType, CollateralType>(
+public(package) fun handle_liquidation<CollateralType>(
     self: &mut Market,
-    balance: Balance<DebtType>,
-    revenue_balance: Balance<DebtType>,
+    repay_balance: Balance<COIN_GUSD>,
+    revenue_balance: Balance<COIN_GUSD>,
     liquidate_amount: u64,
-) {
-    reserve::handle_liquidation(&mut self.vault, balance, revenue_balance);
-    collateral_stats::decrease(&mut self.collateral_stats, get<CollateralType>(), liquidate_amount);
-    update_interest_rates(self);
-}
-
-public(package) fun handle_redeem<T>(
-    self: &mut Market,
-    market_coin_balance: Balance<MarketCoin<T>>,
-    now: u64,
-): Balance<T> {
-    accrue_all_interests(self, now);
-    let redeem_balance = reserve::redeem_underlying_coin(&mut self.vault, market_coin_balance);
-    update_interest_rates(self);
-    redeem_balance
-}
-
-public(package) fun handle_mint<T>(
-    self: &mut Market,
-    balance: Balance<T>,
-    now: u64,
-): Balance<MarketCoin<T>> {
-    accrue_all_interests(self, now);
-    let mint_balance = reserve::mint_market_coin(&mut self.vault, balance);
-    update_interest_rates(self);
-    mint_balance
-}
-
-public(package) fun borrow_flash_loan<T>(
-    self: &mut Market,
-    amount: u64,
     ctx: &mut TxContext,
-): (Coin<T>, FlashLoan<T>) {
-    reserve::borrow_flash_loan<T>(&mut self.vault, amount, ctx)
-}
+) {
+    let principal_balance = reserve::handle_liquidation(
+        &mut self.vault,
+        repay_balance,
+        revenue_balance,
+    );
 
-public(package) fun repay_flash_loan<T>(self: &mut Market, coin: Coin<T>, loan: FlashLoan<T>) {
-    reserve::repay_flash_loan(&mut self.vault, coin, loan)
+    let principal_coin = coin::from_balance(principal_balance, ctx);
+    burn_gusd(self, principal_coin, ctx); // burn the principal portion
+
+    collateral_stats::decrease(&mut self.collateral_stats, get<CollateralType>(), liquidate_amount);
 }
 
 public(package) fun compound_interests(self: &mut Market, now: u64) {
     accrue_all_interests(self, now);
-    update_interest_rates(self);
 }
 
 public(package) fun take_revenue<T>(self: &mut Market, amount: u64, ctx: &mut TxContext): Coin<T> {
@@ -300,7 +299,11 @@ public(package) fun take_borrow_fee<T>(
     reserve::take_borrow_fee<T>(&mut self.vault, amount, ctx)
 }
 
-public(package) fun add_borrow_fee<T>(self: &mut Market, balance: Balance<T>, ctx: &mut TxContext) {
+public(package) fun add_borrow_fee<T>(
+    self: &mut Market,
+    balance: Balance<COIN_GUSD>,
+    ctx: &mut TxContext,
+) {
     reserve::add_borrow_fee<T>(&mut self.vault, balance, ctx);
 }
 
@@ -314,7 +317,7 @@ public(package) fun accrue_all_interests(self: &mut Market, now: u64) {
         let last_updated = borrow_dynamics::last_updated_by_type(&self.borrow_dynamics, type_name);
         if (last_updated == now) {
             i = i + 1;
-            continue;
+            continue
         };
 
         let old_borrow_index = borrow_dynamics::borrow_index_by_type(
@@ -341,24 +344,69 @@ public(package) fun accrue_all_interests(self: &mut Market, now: u64) {
     };
 }
 
-fun update_interest_rates(self: &mut Market) {
-    let asset_types = reserve::asset_types(&self.vault);
-    let mut i = 0;
-    let n = vector::length(&asset_types);
-    while (i < n) {
-        let type_name = *vector::borrow(&asset_types, i);
-        let util_rate = reserve::util_rate(&self.vault, type_name);
-        let interest_model = ac_table::borrow(&self.interest_models, type_name);
-        let (new_interest_rate, interest_rate_scale) = interest_model::calc_interest(
-            interest_model,
-            util_rate,
-        );
-        borrow_dynamics::update_interest_rate(
-            &mut self.borrow_dynamics,
-            type_name,
-            new_interest_rate,
-            interest_rate_scale,
-        );
-        i = i + 1;
-    };
+public(package) fun mint_gusd(
+    self: &mut Market,
+    amount: u64,
+    now: u64,
+    ctx: &mut TxContext,
+): Coin<COIN_GUSD> {
+    assert!(option::is_some(&self.gusd_treasury_cap), error::invalid_params_error());
+    accrue_all_interests(self, now);
+    let cap_ref = option::borrow_mut(&mut self.gusd_treasury_cap);
+    let coin = coin_gusd::coin_gusd::mint(cap_ref, amount, ctx);
+
+    event::emit(MintEvent {
+        minter: tx_context::sender(ctx),
+        amount,
+    });
+
+    coin
+}
+
+public(package) fun burn_gusd(self: &mut Market, amount: Coin<COIN_GUSD>, ctx: &TxContext) {
+    assert!(option::is_some(&self.gusd_treasury_cap), error::invalid_params_error());
+    let cap_ref = option::borrow_mut(&mut self.gusd_treasury_cap);
+    let val = coin::value(&amount);
+    coin_gusd::coin_gusd::burn(cap_ref, amount);
+
+    event::emit(BurnEvent {
+        burner: tx_context::sender(ctx),
+        amount: val,
+    });
+}
+
+public(package) fun set_flash_loan_single_cap(self: &mut Market, single_cap: u64) {
+    self.flash_loan_single_cap = single_cap;
+}
+
+public fun get_flash_loan_single_cap(self: &Market): (u64) {
+    (self.flash_loan_single_cap)
+}
+
+public(package) fun borrow_flash_loan(
+    self: &mut Market,
+    amount: u64,
+    now: u64,
+    ctx: &mut TxContext,
+): (Coin<COIN_GUSD>, FlashLoan<COIN_GUSD>) {
+    assert!(amount <= self.flash_loan_single_cap, error::flashloan_exceed_single_cap_error());
+
+    let coin = mint_gusd(self, amount, now, ctx);
+    let loan = reserve::borrow_flash_loan(&mut self.vault, amount);
+    (coin, loan)
+}
+
+public(package) fun repay_flash_loan(
+    self: &mut Market,
+    coin: Coin<COIN_GUSD>,
+    loan: FlashLoan<COIN_GUSD>,
+    ctx: &mut TxContext,
+) {
+    let (principal_coin) = reserve::repay_flash_loan(
+        &mut self.vault,
+        coin,
+        loan,
+        ctx,
+    );
+    burn_gusd(self, principal_coin, ctx);
 }

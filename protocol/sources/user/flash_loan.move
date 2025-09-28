@@ -1,15 +1,14 @@
-/// @title Module for flash loan from Scallop base asset pools
-/// @author Scallop Labs
 module protocol::flash_loan;
 
+use coin_gusd::coin_gusd::COIN_GUSD;
 use protocol::error;
 use protocol::market::{Self, Market};
 use protocol::reserve::{Self, FlashLoan};
 use protocol::version::{Self, Version};
 use std::type_name::{Self, TypeName};
+use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
-use whitelist::whitelist;
 
 #[allow(unused_field)]
 public struct BorrowFlashLoanEvent has copy, drop {
@@ -42,48 +41,50 @@ public struct RepayFlashLoanV2Event has copy, drop {
     fee: u64,
 }
 
-/// @notice Borrow flash loan from Scallop market
+/// @notice Borrow flash loan
 /// @dev Flash loan is a loan that is borrowed and repaid in the same transaction
 /// @param version The version control object, contract version must match with this
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param market object, it contains base assets, and related protocol configs
 /// @param amount The amount of flash loan to borrow
 /// @param ctx The SUI transaction context object
 /// @return The borrowed coin object and the flash loan hot potato object
 /// @custom:T The type of asset to borrow
-public fun borrow_flash_loan<T>(
+public fun borrow_flash_loan(
     version: &Version,
     market: &mut Market,
     amount: u64,
+    clock: &Clock,
     ctx: &mut TxContext,
-): (Coin<T>, FlashLoan<T>) {
+): (Coin<COIN_GUSD>, FlashLoan<COIN_GUSD>) {
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
     // check if version is supported
     version::assert_current_version(version);
 
-    let (coin, receipt) = borrow_flash_loan_internal<T>(
+    let (coin, receipt) = borrow_flash_loan_internal(
         market,
         amount,
+        clock,
         ctx,
     );
 
     (coin, receipt)
 }
 
-fun borrow_flash_loan_internal<T>(
+fun borrow_flash_loan_internal(
     market: &mut Market,
     amount: u64,
+    clock: &Clock,
     ctx: &mut TxContext,
-): (Coin<T>, FlashLoan<T>) {
-    // check if sender is in whitelist
-    assert!(
-        whitelist::is_address_allowed(market::uid(market), tx_context::sender(ctx)),
-        error::whitelist_error(),
-    );
+): (Coin<COIN_GUSD>, FlashLoan<COIN_GUSD>) {
 
-    let coin_type = type_name::get<T>();
+    let now = clock::timestamp_ms(clock) / 1000;
+
+    let coin_type = type_name::with_defining_ids<COIN_GUSD>();
     // check if base asset is active
     assert!(market::is_base_asset_active(market, coin_type), error::base_asset_not_active_error());
 
-    let (coin, receipt) = market::borrow_flash_loan<T>(market, amount, ctx);
+    let (coin, receipt) = market::borrow_flash_loan(market, amount, now, ctx);
 
     // Emit the borrow flash loan event
     emit(BorrowFlashLoanV2Event {
@@ -99,19 +100,19 @@ fun borrow_flash_loan_internal<T>(
     (coin, receipt)
 }
 
-/// @notice Repay flash loan to Scallop market
+/// @notice Repay flash loan
 /// @dev This is the only method to repay flash loan, consume the flash loan hot potato object
 /// @param version The version control object, contract version must match with this
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param market object, it contains base assets, and related protocol configs
 /// @param coin The coin object to repay
 /// @param loan The flash loan hot potato object, which contains the borrowed amount and fee
 /// @ctx The SUI transaction context object
 /// @custom:T The type of asset to repay
-public fun repay_flash_loan<T>(
+public fun repay_flash_loan(
     version: &Version,
     market: &mut Market,
-    coin: Coin<T>,
-    loan: FlashLoan<T>,
+    coin: Coin<COIN_GUSD>,
+    loan: FlashLoan<COIN_GUSD>,
     ctx: &mut TxContext,
 ) {
     // check if version is supported
@@ -120,11 +121,11 @@ public fun repay_flash_loan<T>(
     // Emit the repay flash loan event
     emit(RepayFlashLoanV2Event {
         borrower: tx_context::sender(ctx),
-        asset: type_name::get<T>(),
+        asset: type_name::with_defining_ids<COIN_GUSD>(),
         amount: coin::value(&coin),
         fee: reserve::flash_loan_fee(&loan),
     });
 
     // Put the asset back to the market and consume the flash loan hot potato object
-    market::repay_flash_loan(market, coin, loan)
+    market::repay_flash_loan(market, coin, loan, ctx);
 }

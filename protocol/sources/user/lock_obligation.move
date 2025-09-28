@@ -1,5 +1,5 @@
 /// @title This module is designed to let liquidator unlock unhealthy obligation for later liquidation
-/// @author Scallop Labs
+/// @author Creek Labs
 /// @notice When obligation is locked, no operation is allowed on it.
 ///         But there's special case: when obligation becomes unhealthy, liquidator should be able to enforce the unlock for liquidation.
 module protocol::lock_obligation;
@@ -25,7 +25,7 @@ public struct ObligationUnhealthyUnlocked has copy, drop {
 /// @dev Anyone can unlock the obligation if it becomes unhealthy.
 ///      Another authorized contract should have a method which call this function to allow for liquidator to unlock the obligation.
 /// @param obligation The obligation to be unlocked
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param market The Creek market object, it contains base assets, and related protocol configs
 /// @param coin_decimals_registry The registry object which contains the decimal information of coins
 /// @param x_oracle The x-oracle object which provides the price of assets
 /// @param clock The SUI system Clock object

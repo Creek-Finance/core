@@ -6,8 +6,6 @@ public struct BorrowFeeKey has copy, drop, store {
     asset_type: TypeName,
 }
 
-public struct BorrowFeeRecipientKey has copy, drop, store {}
-
 public struct SupplyLimitKey has copy, drop, store {
     asset_type: TypeName,
 }
@@ -22,14 +20,6 @@ public struct IsolatedAssetKey has copy, drop, store {
 
 public fun borrow_fee_key(type_name: TypeName): BorrowFeeKey {
     BorrowFeeKey { asset_type: type_name }
-}
-
-public fun borrow_fee_recipient_key(): BorrowFeeRecipientKey {
-    BorrowFeeRecipientKey {}
-}
-
-public fun supply_limit_key(type_name: TypeName): SupplyLimitKey {
-    SupplyLimitKey { asset_type: type_name }
 }
 
 public fun isolated_asset_key(type_name: TypeName): IsolatedAssetKey {

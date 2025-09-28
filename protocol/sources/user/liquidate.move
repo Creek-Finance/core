@@ -1,9 +1,10 @@
 /// @title Module for handling the liquidation request
-/// @author Scallop Labs
-/// @notice Scallop adopts soft liquidation. Liquidation amount should be no bigger than the amount that would drecrease the risk level of obligation to 1.
+/// @author Creek Labs
+/// @notice Creek adopts soft liquidation. Liquidation amount should be no bigger than the amount that would drecrease the risk level of obligation to 1.
 module protocol::liquidate;
 
 use coin_decimals_registry::coin_decimals_registry::CoinDecimalsRegistry;
+use coin_gusd::coin_gusd::COIN_GUSD;
 use protocol::error;
 use protocol::liquidation_evaluator::liquidation_amounts;
 use protocol::market::{Self, Market};
@@ -16,7 +17,6 @@ use sui::balance;
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
-use whitelist::whitelist;
 use x_oracle::x_oracle::XOracle;
 
 #[allow(unused_field)]
@@ -43,28 +43,18 @@ public struct LiquidateEventV2 has copy, drop {
     timestamp: u64,
 }
 
-/// @notice Liquidate the obligation if possible, transfer the remainning base asset and liquidated collateral to the liquidator
-/// @dev This is a wrapper of `liquidate`, meant to be called by frontend.
-/// @param version The version control object, contract version must match with this
-/// @param obligation The obligation to be liquidated
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
-/// @param available_repay_coin The base asset used to repay the debt for the obligation
-/// @param coin_decimals_registry The registry object which contains the decimal information of coins
-/// @param x_oracle The oracle object, used to get the price of the collateral and debt
-/// @param clock The SUI system clock object, used to get the current timestamp
-/// @param ctx The SUI transaction context object
-public entry fun liquidate_entry<DebtType, CollateralType>(
+public entry fun liquidate_entry<CollateralType>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,
-    available_repay_coin: Coin<DebtType>,
+    available_repay_coin: Coin<COIN_GUSD>,
     coin_decimals_registry: &CoinDecimalsRegistry,
     x_oracle: &XOracle,
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
     // Try to liquidate the obligation
-    let (remain_coin, collateral_coin) = liquidate<DebtType, CollateralType>(
+    let (remain_coin, collateral_coin) = liquidate<CollateralType>(
         version,
         obligation,
         market,
@@ -80,87 +70,71 @@ public entry fun liquidate_entry<DebtType, CollateralType>(
     transfer::public_transfer(collateral_coin, tx_context::sender(ctx));
 }
 
-/// @notice Liquidate the obligation if possible, return the remaining base asset and liquidated collateral
-/// @dev It's best to call `liquidation_evaluator::max_liquidation_amounts` to get the max liquidable amount before calling this function
-/// @param version The version control object, contract version must match with this
-/// @param obligation The obligation to be liquidated
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
-/// @param available_repay_coin The base asset used to repay the debt for the obligation
-/// @param coin_decimals_registry The registry object which contains the decimal information of coins
-/// @param x_oracle The oracle object, used to get the price of the collateral and debt
-/// @param clock The SUI system clock object, used to get the current timestamp
-/// @param ctx The SUI transaction context object
-/// @return the remaining base asset and liquidated collateral
-public fun liquidate<DebtType, CollateralType>(
+public fun liquidate<CollateralType>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,
-    available_repay_coin: Coin<DebtType>,
+    available_repay_coin: Coin<COIN_GUSD>,
     coin_decimals_registry: &CoinDecimalsRegistry,
     x_oracle: &XOracle,
     clock: &Clock,
     ctx: &mut TxContext,
-): (Coin<DebtType>, Coin<CollateralType>) {
-    // Check the version
+): (Coin<COIN_GUSD>, Coin<CollateralType>) {
     version::assert_current_version(version);
 
-    // check if sender is in whitelist
-    assert!(
-        whitelist::is_address_allowed(market::uid(market), tx_context::sender(ctx)),
-        error::whitelist_error(),
-    );
-
-    // check if obligation is locked
     assert!(obligation::liquidate_locked(obligation) == false, error::obligation_locked());
 
     let mut available_repay_balance = coin::into_balance(available_repay_coin);
     let now = clock::timestamp_ms(clock) / 1000;
-    // Accrue interests for market
+
+    // Accrue interests for market & obligation
     market::accrue_all_interests(market, now);
-    // Accrue interests & rewards for obligation
     obligation::accrue_interests_and_rewards(obligation, market);
 
-    // Calc liquidation amounts for the given debt type
+    // calculate liquidation amounts
+    // including repay_on_behalf, repay_revenue, liq_amount
     let available_repay_amount = balance::value(&available_repay_balance);
     let (repay_on_behalf, repay_revenue, liq_amount) = liquidation_amounts<
-        DebtType,
+        COIN_GUSD,
         CollateralType,
     >(obligation, market, coin_decimals_registry, available_repay_amount, x_oracle, clock);
+
     assert!(liq_amount > 0, error::unable_to_liquidate_error());
 
-    // withdraw the collateral balance from obligation
+    // withdraw collateral from obligation
     let collateral_balance = obligation::withdraw_collateral<CollateralType>(
         obligation,
         liq_amount,
     );
-    // Reduce the debt for the obligation
-    let debt_type = type_name::get<DebtType>();
-    obligation::decrease_debt(obligation, debt_type, repay_on_behalf);
-    market::handle_inflow<DebtType>(market, repay_on_behalf, now);
 
-    // Put the repay and revenue balance to the market
+    // decrease debt from obligation
+    obligation::decrease_debt(obligation, type_name::get<COIN_GUSD>(), repay_on_behalf);
+
+    // handle liquidation in market & reserve
     let repay_on_behalf_balance = balance::split(&mut available_repay_balance, repay_on_behalf);
     let revenue_balance = balance::split(&mut available_repay_balance, repay_revenue);
-    market::handle_liquidation<DebtType, CollateralType>(
+
+    market::handle_liquidation<CollateralType>(
         market,
         repay_on_behalf_balance,
         revenue_balance,
         liq_amount,
+        ctx,
     );
 
     emit(LiquidateEventV2 {
         liquidator: tx_context::sender(ctx),
         obligation: object::id(obligation),
-        debt_type: type_name::get<DebtType>(),
+        debt_type: type_name::get<COIN_GUSD>(),
         collateral_type: type_name::get<CollateralType>(),
         repay_on_behalf,
         repay_revenue,
         liq_amount,
         collateral_price: price::get_price(x_oracle, type_name::get<CollateralType>(), clock),
-        debt_price: price::get_price(x_oracle, type_name::get<DebtType>(), clock),
+        debt_price: price::get_price(x_oracle, type_name::get<COIN_GUSD>(), clock),
         timestamp: now,
     });
 
-    // Send the remaining balance, and collateral balance to liquidator
+    // return the remaining repay coin and the collateral coin
     (coin::from_balance(available_repay_balance, ctx), coin::from_balance(collateral_balance, ctx))
 }

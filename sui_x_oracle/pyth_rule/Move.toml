@@ -6,7 +6,7 @@ published-at = "0x1cf913c825c202cbbb71c378edccb9c04723fa07a73b88677b2ef89c6e203a
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
-rev = "mainnet"
+rev = "testnet"
 override = true
 
 [dependencies.Pyth]

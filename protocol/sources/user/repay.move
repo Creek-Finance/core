@@ -1,8 +1,9 @@
 /// @title Module for hanlding withdraw collateral request from user
-/// @author Scallop Labs
+/// @author Creek Labs
 /// @notice User can withdarw collateral as long as the obligation risk level is lower than 1
 module protocol::repay;
 
+use coin_gusd::coin_gusd::COIN_GUSD;
 use protocol::error;
 use protocol::market::{Self, Market};
 use protocol::obligation::{Self, Obligation};
@@ -12,7 +13,6 @@ use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
 use sui::math;
-use whitelist::whitelist;
 
 public struct RepayEvent has copy, drop {
     repayer: address,
@@ -26,8 +26,8 @@ public struct RepayEvent has copy, drop {
 /// @dev Anyone can repay the debt of the obligation, not only the owner of the obligation.
 ///      If repay amount is more than the debt, the remaining amount will be refunded to the sender
 /// @param version The version control object, contract version must match with this
-/// @param obligation The Scallop obligation object, debt will be decreased according to repay amount
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param obligation The Creek obligation object, debt will be decreased according to repay amount
+/// @param market The Creek market object, it contains base assets, and related protocol configs
 /// @param user_coin The coin object that user wants to repay
 /// @param clock The SUI system clock object, used to get current timestamp
 /// @param ctx The SUI transaction context object
@@ -36,20 +36,16 @@ public entry fun repay<T>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,
-    mut user_coin: Coin<T>,
+    mut user_coin: Coin<COIN_GUSD>,
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
     // Check contract version
     version::assert_current_version(version);
 
     assert!(coin::value(&user_coin) > 0, error::zero_repay_amount_error());
-
-    // check if sender is in whitelist
-    assert!(
-        whitelist::is_address_allowed(market::uid(market), tx_context::sender(ctx)),
-        error::whitelist_error(),
-    );
 
     // check if obligation is locked, if locked, unlock is needed before calling this
     // This is a mechanism to enforce some actions to be done before repay
@@ -66,10 +62,10 @@ public entry fun repay<T>(
     // If the given coin is more than the debt, repay the debt only
     let (debt_amount, _) = obligation::debt(obligation, coin_type);
     let repay_amount = math::min(debt_amount, coin::value(&user_coin));
-    let repay_coin = coin::split<T>(&mut user_coin, repay_amount, ctx);
+    let repay_coin = coin::split<COIN_GUSD>(&mut user_coin, repay_amount, ctx);
 
     // Put the repay asset into market
-    market::handle_repay<T>(market, coin::into_balance(repay_coin));
+    market::handle_repay<T>(market, repay_coin, ctx);
 
     // Decrease repay amount to the outflow limiter
     market::handle_inflow<T>(market, repay_amount, now);

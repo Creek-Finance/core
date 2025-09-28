@@ -1,0 +1,13 @@
+[package]
+name = "xaum_indicator_pyth_adapter"
+edition = "2024.beta"
+
+[dependencies]
+Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "sui-contract-testnet" }
+xaum_indicator_core = { local = "../core" }
+XOracle = { local = "../../sui_x_oracle/x_oracle" }
+
+[addresses]
+xaum_indicator_pyth_adapter = "0x0"
+
+

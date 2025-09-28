@@ -1,8 +1,5 @@
 module protocol::error {
 
-  // whitelist
-  public fun whitelist_error(): u64 { 0x0000101 }
-
   // version
   public fun version_mismatch_error(): u64 { 0x0000201 }
 
@@ -25,9 +22,11 @@ module protocol::error {
   // borrow
   public fun borrow_too_much_error(): u64 { 0x0000501 }
   public fun borrow_too_small_error(): u64 { 0x0000502 }
-  public fun flash_loan_repay_not_enough_error(): u64 { 0x0000503 }
-  public fun unable_to_borrow_a_collateral_coin(): u64 { 0x0000504 }
-  public fun unable_to_borrow_other_coin_with_isolated_asset(): u64 { 0x0000505 }
+  public fun unable_to_borrow_a_collateral_coin(): u64 { 0x0000503 }
+  public fun unable_to_borrow_other_coin_with_isolated_asset(): u64 { 0x0000504 }
+  public fun invalid_coin_type(): u64 { 0x0000505 }
+  public fun flash_loan_repay_not_enough_error(): u64 { 0x0000506 }
+  public fun flashloan_exceed_single_cap_error(): u64 { 0x0000507 }
 
   // liquidation
   public fun unable_to_liquidate_error(): u64 { 0x0000601 }
@@ -38,10 +37,6 @@ module protocol::error {
   public fun withdraw_collateral_too_much_error(): u64 { 0x0000703 }
   public fun unable_to_deposit_a_borrowed_coin(): u64 { 0x0000704 }
 
-  // market coin error
-  public fun mint_market_coin_too_small_error(): u64 { 0x0000801 }
-  public fun redeem_market_coin_too_small_error(): u64 { 0x0000802 }
-
   // admin
   public fun interest_model_type_not_match_error(): u64 { 0x0000901 }
   public fun risk_model_type_not_match_error(): u64 { 0x0000902 }
@@ -49,9 +44,6 @@ module protocol::error {
 
   // misc
   public fun outflow_reach_limit_error(): u64 { 0x0001001 }
-
-  // flashloan
-  public fun flash_loan_not_paid_enough(): u64 { 0x0011001 }
 
   // asset not active errors
   public fun base_asset_not_active_error(): u64 { 0x0012001 }
@@ -63,11 +55,13 @@ module protocol::error {
 
   // pool liquidity errors
   public fun pool_liquidity_not_enough_error(): u64 { 0x0014001 }
-  public fun supply_limit_reached(): u64 { 0x0014002 }
-  public fun collateral_not_enough(): u64 { 0x0014003 }
-  public fun reserve_not_enough_error(): u64 { 0x0014004 }
-  public fun borrow_limit_reached_error(): u64 { 0x0014005 }
+  public fun collateral_not_enough(): u64 { 0x0014002 }
+  public fun reserve_not_enough_error(): u64 { 0x0014003 }
+  public fun borrow_limit_reached_error(): u64 { 0x0014004 }
 
   // repay
   public fun zero_repay_amount_error(): u64 { 0x0015001 }
+
+  // market
+  public fun market_paused_error(): u64 { 0x0016001 }
 }

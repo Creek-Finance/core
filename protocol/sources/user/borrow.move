@@ -1,28 +1,23 @@
 /// @title A module dedicated for handling the borrow request from user
-/// @author Scallop Labs
+/// @author Creek Labs
 module protocol::borrow;
 
 use coin_decimals_registry::coin_decimals_registry::CoinDecimalsRegistry;
-use math::u64;
+use coin_gusd::coin_gusd::COIN_GUSD;
 use protocol::borrow_withdraw_evaluator;
 use protocol::error;
 use protocol::interest_model;
 use protocol::market::{Self, Market};
-use protocol::market_dynamic_keys::{Self, BorrowFeeKey, BorrowLimitKey, BorrowFeeRecipientKey};
+use protocol::market_dynamic_keys::{Self, BorrowFeeKey, BorrowLimitKey};
 use protocol::obligation::{Self, Obligation, ObligationKey};
 use protocol::version::{Self, Version};
 use std::fixed_point32::{Self, FixedPoint32};
 use std::type_name::{Self, TypeName};
-use std::vector;
-use sui::balance::{Self, Balance};
+use sui::balance::Balance;
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::dynamic_field;
 use sui::event::emit;
-use sui::object::{Self, ID};
-use sui::transfer;
-use sui::tx_context::{Self, TxContext};
-use whitelist::whitelist;
 use x_oracle::x_oracle::XOracle;
 
 #[allow(unused_field)]
@@ -59,7 +54,7 @@ public struct BorrowEventV3 has copy, drop {
 /// @param version The version control object, contract version must match with this
 /// @param obligation The obligation object which contains the collateral and debt information
 /// @param obligation_key The key to prove the ownership the obligation object
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param market The Creek market object, it contains base assets, and related protocol configs
 /// @param coin_decimals_registry The registry object which contains the decimal information of coins
 /// @param borrow_amount The amount of asset to borrow
 /// @param x_oracle The x-oracle object which provides the price of assets
@@ -77,6 +72,8 @@ public entry fun borrow_entry<T>(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
     let borrowed_coin = borrow<T>(
         version,
         obligation,
@@ -92,11 +89,11 @@ public entry fun borrow_entry<T>(
 }
 
 /// @notice Borrow a certain amount of asset from the protocol
-/// @dev This function is composable, third party contract call this method to borrow from Scallop
+/// @dev This function is composable, third party contract call this method to borrow from Creek
 /// @param version The version control object, contract version must match with this
 /// @param obligation The obligation object which contains the collateral and debt information
 /// @param obligation_key The key to prove the ownership the obligation object
-/// @param market The Scallop market object, it contains base assets, and related protocol configs
+/// @param market The Creek market object, it contains base assets, and related protocol configs
 /// @param coin_decimals_registry The registry object which contains the decimal information of coins
 /// @param borrow_amount The amount of asset to borrow
 /// @param x_oracle The x-oracle object which provides the price of assets
@@ -114,26 +111,27 @@ public fun borrow<T>(
     x_oracle: &XOracle,
     clock: &Clock,
     ctx: &mut TxContext,
-): Coin<T> {
+): Coin<COIN_GUSD> {
     // check if version is supported
     version::assert_current_version(version);
 
+    // global pause check
+    assert!(!market::is_paused(market), error::market_paused_error());
+
     let borrow_fee_discount = 0;
-    let borrow_fee_referral_share = 0;
-    let (borrowed_balance) = borrow_internal<T>(
+    let (borrowed_coin) = borrow_internal<T>(
         obligation,
         obligation_key,
         market,
         coin_decimals_registry,
         borrow_amount,
         borrow_fee_discount,
-        borrow_fee_referral_share,
         x_oracle,
         clock,
         ctx,
     );
 
-    coin::from_balance(borrowed_balance, ctx)
+    borrowed_coin
 }
 
 // check whether the borrowed asset is isolated
@@ -187,25 +185,17 @@ fun borrow_internal<T>(
     coin_decimals_registry: &CoinDecimalsRegistry,
     borrow_amount: u64,
     borrow_fee_discount: u64,
-    borrow_fee_referral_share: u64,
     x_oracle: &XOracle,
     clock: &Clock,
     ctx: &mut TxContext,
-): (Balance<T>) {
-    // check if sender is in whitelist
-    assert!(
-        whitelist::is_address_allowed(market::uid(market), tx_context::sender(ctx)),
-        error::whitelist_error(),
-    );
-
+): Coin<COIN_GUSD> {
     // check if obligation is locked, if locked, unlock operation is required before calling this function
-    // This is a mechanism to enforce some operations before calling the function
     assert!(obligation::borrow_locked(obligation) == false, error::obligation_locked());
 
     let coin_type = type_name::get<T>();
 
-    // check if base asset is active
-    assert!(market::is_base_asset_active(market, coin_type), error::base_asset_not_active_error());
+    // Ensure T is COIN_GUSD since only GUSD can be borrowed
+    assert!(coin_type == type_name::get<COIN_GUSD>(), error::invalid_coin_type());
 
     let now = clock::timestamp_ms(clock) / 1000;
 
@@ -224,7 +214,19 @@ fun borrow_internal<T>(
     // Make sure the borrow amount is bigger than the minimum borrow amount
     let interest_model = market::interest_model(market, coin_type);
     let min_borrow_amount = interest_model::min_borrow_amount(interest_model);
-    assert!(borrow_amount > min_borrow_amount, error::borrow_too_small_error());
+
+    // Calculate the base borrow fee
+    let base_borrow_fee_key = market_dynamic_keys::borrow_fee_key(type_name::get<T>());
+    let base_borrow_fee_rate = dynamic_field::borrow<BorrowFeeKey, FixedPoint32>(
+        market::uid(market),
+        base_borrow_fee_key,
+    );
+    let base_borrow_fee_amount = fixed_point32::multiply_u64(borrow_amount, *base_borrow_fee_rate);
+
+    assert!(
+        borrow_amount > min_borrow_amount + base_borrow_fee_amount,
+        error::borrow_too_small_error(),
+    );
 
     // assert borrow limit
     let borrow_limit_key = market_dynamic_keys::borrow_limit_key(coin_type);
@@ -239,20 +241,26 @@ fun borrow_internal<T>(
     // Add borrow amount to the outflow limiter, if limit is reached then abort
     market::handle_outflow<T>(market, borrow_amount, now);
 
-    // Always update market state first
-    // Because interest need to be accrued first before other operations
-    let mut borrowed_balance = market::handle_borrow<T>(market, borrow_amount, now);
+    // Call mint_gusd to get Coin<COIN_GUSD>
+    let mut borrowed_coin = market::mint_gusd(market, borrow_amount, now, ctx);
 
     // init debt if borrow for the first time
     obligation::init_debt(obligation, market, coin_type);
 
-    // accure interests & rewards for obligation
+    // accrue interests & rewards for obligation
     obligation::accrue_interests_and_rewards(obligation, market);
 
-    // calc the maximum borrow amount
+    //     calc the maximum borrow amount
     // If borrow too much, abort
-    // let max_borrow_amount = borrow_withdraw_evaluator::max_borrow_amount<T>(obligation, market, coin_decimals_registry, x_oracle, clock);
-    // assert!(borrow_amount <= max_borrow_amount, error::borrow_too_much_error());
+    let max_borrow_amount = borrow_withdraw_evaluator::max_borrow_amount<T>(
+        obligation,
+        market,
+        coin_decimals_registry,
+        x_oracle,
+        clock,
+    );
+    assert!(borrow_amount <= max_borrow_amount, error::borrow_too_much_error());
+
     // increase the debt for obligation
     obligation::increase_debt(obligation, coin_type, borrow_amount);
 
@@ -276,28 +284,13 @@ fun borrow_internal<T>(
         error::borrow_too_much_error(),
     );
 
-    // Calculate the base borrow fee
-    let base_borrow_fee_key = market_dynamic_keys::borrow_fee_key(type_name::get<T>());
-    let base_borrow_fee_rate = dynamic_field::borrow<BorrowFeeKey, FixedPoint32>(
-        market::uid(market),
-        base_borrow_fee_key,
-    );
-    let base_borrow_fee_amount = fixed_point32::multiply_u64(borrow_amount, *base_borrow_fee_rate);
+    // Split the borrow fee from borrowed coin
+    let final_borrow_fee = coin::split(&mut borrowed_coin, base_borrow_fee_amount, ctx);
 
-    // Calculate the referral fee and deducted fee
-    let final_borrow_fee_amount = base_borrow_fee_amount;
-    // Get the borrow fee collector address
-    let borrow_fee_recipient_key = market_dynamic_keys::borrow_fee_recipient_key();
-    let borrow_fee_recipient = dynamic_field::borrow<BorrowFeeRecipientKey, address>(
-        market::uid(market),
-        borrow_fee_recipient_key,
-    );
-
-    // Split the borrow fee from borrowed asset
-    let final_borrow_fee = balance::split(&mut borrowed_balance, final_borrow_fee_amount);
+    let final_borrow_fee_balance: Balance<COIN_GUSD> = coin::into_balance(final_borrow_fee);
 
     // Add the borrow fee to the market
-    market::add_borrow_fee<T>(market, final_borrow_fee, ctx);
+    market::add_borrow_fee<T>(market, final_borrow_fee_balance, ctx);
 
     // Emit the borrow event
     emit(BorrowEventV3 {
@@ -305,12 +298,11 @@ fun borrow_internal<T>(
         obligation: object::id(obligation),
         asset: coin_type,
         amount: borrow_amount,
-        // borrow fee that protocol received
-        borrow_fee: final_borrow_fee_amount,
+        borrow_fee: base_borrow_fee_amount,
         borrow_fee_discount,
         time: now,
     });
 
-    // Return the borrowed asset
-    borrowed_balance
+    // Return the borrowed coin
+    borrowed_coin
 }

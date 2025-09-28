@@ -1,5 +1,5 @@
 /// @title This module is dedicated for creating new obligations
-/// @author Scallop Labs
+/// @author Creek Labs
 /// @notice Offer 2 ways of creating obligation:
 ///   1. Create a fresh obligation with one method call
 ///   2. Create an obligation and hot potato, and call another method to consume the hot poato and share the obligation
