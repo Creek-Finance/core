@@ -15,13 +15,13 @@ The protocol consists of several key components:
 ## 🪙 Token System
 
 ### GR Token (Governance Rights)
-- **Purpose**: Governance token earned through XAUM staking
+- **Purpose**: Stability token pegged to gold's moving average price that captures gold's stable value.
 - **Supply**: Dynamic supply controlled by StakingManager
 - **Decimals**: 9
 - **Minting**: Only through XAUM staking
 
 ### GY Token (Yield Share)
-- **Purpose**: Yield token representing share of staking rewards
+- **Purpose**: Volatility token pegged to gold's price fluctuations that captures gold's volatility value.
 - **Supply**: Dynamic supply controlled by StakingManager
 - **Decimals**: 9
 - **Minting**: Only through XAUM staking
