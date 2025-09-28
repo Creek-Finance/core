@@ -11,7 +11,7 @@ fun init(witness: COIN_GUSD, ctx: &mut TxContext) {
         9,
         b"GUSD",
         b"GUSD Token",
-        b"GUSD is a stablecoin collateralized with GR tokens",
+        b"GUSD is a stablecoin backed by over-collateralized gold reserves that maintains USD stability.",
         option::none(),
         ctx,
     );

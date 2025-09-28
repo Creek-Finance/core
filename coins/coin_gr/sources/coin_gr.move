@@ -13,7 +13,7 @@ fun init(witness: COIN_GR, ctx: &mut TxContext) {
         9,
         b"GR",
         b"GR Token",
-        b"GR is a reward token earned through XAUM staking, representing governance rights",
+        b"GR is a stability token pegged to gold's moving average price that captures gold's stable value.",
         option::none(),
         ctx,
     );

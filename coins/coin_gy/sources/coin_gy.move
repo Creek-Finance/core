@@ -13,7 +13,7 @@ fun init(witness: COIN_GY, ctx: &mut TxContext) {
         9,
         b"GY",
         b"GY Token",
-        b"GY is a yield token earned through XAUM staking, representing yield share",
+        b"GY is a volatility token pegged to gold's price fluctuations that captures gold's volatility value.",
         option::none(),
         ctx,
     );
