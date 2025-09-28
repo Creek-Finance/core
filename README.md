@@ -120,7 +120,6 @@ The protocol consists of several key components:
 - Isolated asset support
 
 ### Interest Models
-- Utilization-based rates
 - Configurable parameters
 - Time-based accrual
 
