@@ -123,7 +123,6 @@ The protocol consists of several key components:
 - Dynamic risk parameter updates with governance delays
 
 ### Interest Models
-- Dynamic interest rate calculations
 - Utilization-based rates
 - Configurable parameters
 - Time-based accrual
