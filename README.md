@@ -14,7 +14,7 @@ The protocol consists of several key components:
 
 ## 🪙 Token System
 
-### GR Token (Governance Rights)
+### GR Token 
 - **Purpose**: Stability token pegged to gold's moving average price that captures gold's stable value.
 - **Supply**: Dynamic supply controlled by StakingManager
 - **Decimals**: 9
@@ -119,7 +119,6 @@ The protocol consists of several key components:
 - Collateral factors (max 95%)
 - Liquidation factors and penalties
 - Isolated asset support
-- Dynamic risk parameter updates with governance delays
 
 ### Interest Models
 - Utilization-based rates
@@ -159,12 +158,6 @@ The protocol consists of several key components:
 - **Oracle Validation**: Multi-source price verification
 - **Health Checks**: Continuous monitoring of user positions
 - **Isolated Assets**: Support for isolated collateral types
-
-## 📈 Governance
-
-- Risk parameter changes require governance approval
-- 7-epoch delay for risk model changes
-- Admin controls for emergency functions
 
 ## 🔍 Monitoring & Events
 
