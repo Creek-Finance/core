@@ -92,7 +92,6 @@ The protocol consists of several key components:
 ### 4. Flash Loans
 - Borrow assets without collateral for single transaction
 - Must be repaid in the same transaction
-- Fee-based system (configurable rates)
 - Single transaction cap: 50,000 GUSD (configurable)
 
 ### 5. Liquidation System
