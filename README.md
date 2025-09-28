@@ -117,7 +117,6 @@ The protocol consists of several key components:
 ### Risk Management
 - Collateral factors (max 95%)
 - Liquidation factors and penalties
-- Isolated asset support
 
 ### Interest Models
 - Configurable parameters
@@ -129,12 +128,6 @@ The protocol consists of several key components:
 - Exchange Rate: 1 XAUM = 100 GR + 100 GY
 - Minimum Stake: 0.001 XAUM
 - Fee Structure: Configurable staking/unstaking fees
-
-### Lending
-- Collateral Factor: Up to 95%
-- Liquidation Factor: Up to 95%
-- Liquidation Penalty: Up to 20%
-- Flash Loan Fee: 0.1%
 
 ### Oracle
 - Price Validation: 1% tolerance
