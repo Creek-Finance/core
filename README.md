@@ -181,7 +181,6 @@ sui move build
 
 ## 📈 Governance
 
-- GR token holders have governance rights
 - Risk parameter changes require governance approval
 - 7-epoch delay for risk model changes
 - Admin controls for emergency functions
