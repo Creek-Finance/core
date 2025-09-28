@@ -14,14 +14,14 @@ The protocol consists of several key components:
 
 ## 🪙 Token System
 
-### GR Token (Governance Rights)
-- **Purpose**: Governance token earned through XAUM staking
+### GR Token 
+- **Purpose**: Stability token pegged to gold's moving average price that captures gold's stable value.
 - **Supply**: Dynamic supply controlled by StakingManager
 - **Decimals**: 9
 - **Minting**: Only through XAUM staking
 
 ### GY Token (Yield Share)
-- **Purpose**: Yield token representing share of staking rewards
+- **Purpose**: Volatility token pegged to gold's price fluctuations that captures gold's volatility value.
 - **Supply**: Dynamic supply controlled by StakingManager
 - **Decimals**: 9
 - **Minting**: Only through XAUM staking
@@ -92,7 +92,6 @@ The protocol consists of several key components:
 ### 4. Flash Loans
 - Borrow assets without collateral for single transaction
 - Must be repaid in the same transaction
-- Fee-based system (configurable rates)
 - Single transaction cap: 50,000 GUSD (configurable)
 
 ### 5. Liquidation System
@@ -120,7 +119,6 @@ The protocol consists of several key components:
 - Collateral factors (max 95%)
 - Liquidation factors and penalties
 - Isolated asset support
-- Dynamic risk parameter updates with governance delays
 
 ### Interest Models
 - Utilization-based rates
@@ -160,12 +158,6 @@ The protocol consists of several key components:
 - **Oracle Validation**: Multi-source price verification
 - **Health Checks**: Continuous monitoring of user positions
 - **Isolated Assets**: Support for isolated collateral types
-
-## 📈 Governance
-
-- Risk parameter changes require governance approval
-- 7-epoch delay for risk model changes
-- Admin controls for emergency functions
 
 ## 🔍 Monitoring & Events
 
