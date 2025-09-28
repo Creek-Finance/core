@@ -138,32 +138,14 @@ The protocol consists of several key components:
 - Collateral Factor: Up to 95%
 - Liquidation Factor: Up to 95%
 - Liquidation Penalty: Up to 20%
-- Flash Loan Fee: Configurable
+- Flash Loan Fee: 0.1%
 
 ### Oracle
 - Price Validation: 1% tolerance
 - Update Frequency: Real-time with staleness checks
 - Decimal Precision: 9 decimals for all prices
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Sui blockchain access
-- Move development environment
-- Understanding of DeFi protocols
-
-### Installation
-```bash
-# Clone the repository
-git clone <repository-url>
-cd core
-
-# Install dependencies (if any)
-# Build the protocol
-sui move build
-```
-
-### Deployment
+## 🚀 Deployment
 1. Deploy coin contracts (GR, GY, GUSD)
 2. Deploy oracle system
 3. Deploy core protocol
