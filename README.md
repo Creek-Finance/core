@@ -104,7 +104,6 @@ The protocol consists of several key components:
 
 ### Market Management
 - Central market object managing all protocol state
-- Dynamic interest rate models
 - Risk parameter management
 - Asset activation controls
 - Pause/unpause functionality
@@ -157,7 +156,6 @@ The protocol consists of several key components:
 - **Access Control**: Admin-only functions for critical operations
 - **Oracle Validation**: Multi-source price verification
 - **Health Checks**: Continuous monitoring of user positions
-- **Isolated Assets**: Support for isolated collateral types
 
 ## 🔍 Monitoring & Events
 
