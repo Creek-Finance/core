@@ -134,49 +134,6 @@ public fun borrow<T>(
     borrowed_coin
 }
 
-// check whether the borrowed asset is isolated
-// if isolated, then check the entire obligation debts should not have any other debt
-fun assert_isolated_asset(market: &Market, obligation: &Obligation, borrow_coin_type: TypeName) {
-    let mut ok = true;
-    if (market::is_isolated_asset(market, borrow_coin_type)) {
-        // if borrowed coin is an isolated asset, then the obligation should not have any other debt
-        let debts = obligation::debt_types(obligation);
-        let mut i = 0;
-        let debts_length = vector::length(&debts);
-        while (i < debts_length) {
-            let debt_type = *vector::borrow(&debts, i);
-            if (debt_type != borrow_coin_type) {
-                let (debt_amount, _) = obligation::debt(obligation, debt_type);
-                if (debt_amount > 0) {
-                    ok = false;
-                    break
-                }
-            };
-
-            i = i + 1;
-        };
-    } else {
-        // if borrowed coin is NOT an isolated asset, then the obligation SHOULD NOT HAVE an isolated asset debt
-        let debts = obligation::debt_types(obligation);
-        let mut i = 0;
-        let debts_length = vector::length(&debts);
-        while (i < debts_length) {
-            let debt_type = *vector::borrow(&debts, i);
-            if (market::is_isolated_asset(market, debt_type)) {
-                let (debt_amount, _) = obligation::debt(obligation, debt_type);
-                if (debt_amount > 0) {
-                    ok = false;
-                    break
-                }
-            };
-
-            i = i + 1;
-        };
-    };
-
-    assert!(ok, error::unable_to_borrow_other_coin_with_isolated_asset());
-}
-
 // @TODO: borrow fee store in an object
 fun borrow_internal<T>(
     obligation: &mut Obligation,
@@ -207,9 +164,6 @@ fun borrow_internal<T>(
         !obligation::has_coin_x_as_collateral(obligation, coin_type),
         error::unable_to_borrow_a_collateral_coin(),
     );
-
-    // make sure the borrow action, follow the isolated asset rules
-    assert_isolated_asset(market, obligation, coin_type);
 
     // Make sure the borrow amount is bigger than the minimum borrow amount
     let interest_model = market::interest_model(market, coin_type);

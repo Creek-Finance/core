@@ -23,10 +23,9 @@ module protocol::error {
   public fun borrow_too_much_error(): u64 { 0x0000501 }
   public fun borrow_too_small_error(): u64 { 0x0000502 }
   public fun unable_to_borrow_a_collateral_coin(): u64 { 0x0000503 }
-  public fun unable_to_borrow_other_coin_with_isolated_asset(): u64 { 0x0000504 }
-  public fun invalid_coin_type(): u64 { 0x0000505 }
-  public fun flash_loan_repay_not_enough_error(): u64 { 0x0000506 }
-  public fun flashloan_exceed_single_cap_error(): u64 { 0x0000507 }
+  public fun invalid_coin_type(): u64 { 0x0000504 }
+  public fun flash_loan_repay_not_enough_error(): u64 { 0x0000505 }
+  public fun flashloan_exceed_single_cap_error(): u64 { 0x0000506 }
 
   // liquidation
   public fun unable_to_liquidate_error(): u64 { 0x0000601 }

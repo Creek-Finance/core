@@ -8,7 +8,6 @@ use protocol::collateral_stats::{Self, CollateralStats, CollateralStat};
 use protocol::error;
 use protocol::interest_model::{Self, InterestModels, InterestModel};
 use protocol::limiter::{Self, Limiters, Limiter};
-use protocol::market_dynamic_keys::{Self, IsolatedAssetKey};
 use protocol::reserve::{Self, Reserve, MarketCoin, FlashLoan};
 use protocol::risk_model::{Self, RiskModels, RiskModel};
 use std::fixed_point32;
@@ -111,14 +110,6 @@ public fun auto_pause_enabled(self: &Market): bool { self.auto_pause_enabled }
 
 public fun auto_pause_threshold(self: &Market): fixed_point32::FixedPoint32 {
     self.auto_pause_threshold
-}
-
-public fun is_isolated_asset(self: &Market, pool_type: TypeName): bool {
-    let isolated_asset_key = market_dynamic_keys::isolated_asset_key(pool_type);
-    if (!df::exists_<IsolatedAssetKey>(&self.id, isolated_asset_key)) {
-        return false
-    };
-    *df::borrow<IsolatedAssetKey, bool>(&self.id, isolated_asset_key)
 }
 
 public(package) fun new(

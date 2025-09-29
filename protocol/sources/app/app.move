@@ -1,19 +1,12 @@
 module protocol::app;
 
 use coin_gusd::coin_gusd::COIN_GUSD;
-use test_coin::coin_xaum::COIN_XAUM;
 use math::fixed_point32_empower;
 use protocol::error;
 use protocol::interest_model::{Self, InterestModels, InterestModel};
 use protocol::limiter::{Self, LimiterUpdateParamsChange, LimiterUpdateLimitChange};
 use protocol::market::{Self, Market};
-use protocol::market_dynamic_keys::{
-    Self,
-    BorrowFeeKey,
-    SupplyLimitKey,
-    BorrowLimitKey,
-    IsolatedAssetKey
-};
+use protocol::market_dynamic_keys::{Self, BorrowFeeKey, BorrowLimitKey};
 use protocol::obligation_access::{Self, ObligationAccessStore};
 use protocol::price as price_eval;
 use protocol::risk_model::{Self, RiskModels, RiskModel};
@@ -25,6 +18,7 @@ use sui::coin::TreasuryCap;
 use sui::dynamic_field;
 use sui::event;
 use sui::package;
+use test_coin::coin_xaum::COIN_XAUM;
 use x::ac_table::AcTableCap;
 use x::one_time_lock_value::OneTimeLockValue;
 use x_oracle::x_oracle::XOracle;
@@ -502,18 +496,6 @@ public entry fun update_borrow_limit<T: drop>(
 
     dynamic_field::remove_if_exists<BorrowLimitKey, u64>(market_uid_mut, key);
     dynamic_field::add(market_uid_mut, key, limit_amount);
-}
-
-public entry fun update_isolated_asset_status<PoolType: drop>(
-    _admin_cap: &AdminCap,
-    market: &mut Market,
-    is_isolated: bool,
-) {
-    let market_uid_mut = market::uid_mut(market);
-    let key = market_dynamic_keys::isolated_asset_key(type_name::get<PoolType>());
-
-    dynamic_field::remove_if_exists<IsolatedAssetKey, bool>(market_uid_mut, key);
-    dynamic_field::add(market_uid_mut, key, is_isolated);
 }
 
 public entry fun set_gusd_cap(
