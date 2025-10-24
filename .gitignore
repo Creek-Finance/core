@@ -1,77 +1,77 @@
-# Sui Move 项目 .gitignore
+# Sui Move project .gitignore
 contracts-deprectaed/
-# 编译产出
+# Build outputs
 **/build/
 **/target/
 bin/
 
-# 依赖缓存
+# Dependency cache
 # **/Move.lock
 
-# IDE 配置
+# IDE configuration
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# 系统文件
+# System files
 .DS_Store
 Thumbs.db
 
-# 日志文件
+# Log files
 *.log
 logs/
 
-# 临时文件
+# Temporary files
 *.tmp
 *.temp
 .cache/
 
-# 环境配置
+# Environment configuration
 .env
 .env.local
 .env.*.local
 !.env.sample
 
-# Node.js (如果有前端组件)
+# Node.js (if frontend components exist)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Python (如果有脚本)
+# Python (if scripts exist)
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
 
-# Sui 客户端配置(敏感信息)
+# Sui client configuration (sensitive information)
 sui_config/
 .sui/
 
-# 部署记录（可能包含敏感信息）
+# Deployment records (may contain sensitive information)
 deployment_*.txt
 *.deploy
 
-# 测试产出
+# Test outputs
 test_results/
 coverage/
 
-# 文档生成
+# Documentation generation
 cursor/
 docs/build/
 
-# 备份文件
+# Backup files
 *.bak
 *.backup
 
-# 密钥文件
+# Key files
 *.key
 *.pem
 keys/
 
-# 本地开发配置
+# Local development configuration
 local.toml
 local_config.toml
 
@@ -81,5 +81,5 @@ CLAUDE.md
 # claude mcp
 .playwright-mcp/
 
-# python虚拟环境
+# Python virtual environment
 sui_venv/
