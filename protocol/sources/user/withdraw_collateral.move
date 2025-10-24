@@ -34,7 +34,7 @@ public struct CollateralWithdrawEvent has copy, drop {
 /// @param clock The SUI system clock object
 /// @param ctx The SUI transaction context object
 /// @custom:T The type of the collateral to withdraw
-public entry fun withdraw_collateral_entry<T>(
+public fun withdraw_collateral_entry<T>(
     version: &Version,
     obligation: &mut Obligation,
     obligation_key: &ObligationKey,

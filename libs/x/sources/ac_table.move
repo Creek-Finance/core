@@ -3,25 +3,20 @@
 /// Read is open to anyone
 module x::ac_table {
   
-  use std::option;
-  use std::vector;
-  use sui::object::{Self, UID};
   use sui::table::{Self, Table};
   use sui::vec_set::{Self, VecSet};
-  use sui::tx_context::TxContext;
-  
   use x::ownership::{Self, Ownership};
   
-  struct AcTable<phantom T: drop, K: copy + drop + store, phantom V: store> has key, store {
+  public struct AcTable<phantom T: drop, K: copy + drop + store, phantom V: store> has key, store {
     id: UID,
     table: Table<K, V>,
     keys: option::Option<VecSet<K>>,
     with_keys: bool
   }
   
-  struct AcTableOwnership has drop {}
+  public struct AcTableOwnership has drop {}
   
-  struct AcTableCap<phantom T> has key, store {
+  public struct AcTableCap<phantom T> has key, store {
     id: UID,
     ownership: Ownership<AcTableOwnership>,
   }

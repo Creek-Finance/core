@@ -1,22 +1,19 @@
 module supra_rule::supra_registry {
 
   use std::type_name::{Self, TypeName};
-  use sui::object::{Self, UID, ID};
   use sui::table::{Self, Table};
-  use sui::tx_context::{Self, TxContext};
-  use sui::transfer;
 
 
   const ERR_ILLEGAL_SUPRA_PAIR: u64 = 0x11306;
   const ERR_ILLEGAL_REGISTRY_CAP: u64 = 0x11307;
 
-  struct SupraRegistry has key {
+  public struct SupraRegistry has key {
     id: UID,
     table: Table<TypeName, u32>
   }
-  struct SupraRegistryCap has key, store {
+  public struct SupraRegistryCap has key, store {
     id: UID,
-    for: ID,
+    for_registry: ID,
   }
 
   fun init(ctx: &mut TxContext) {
@@ -26,18 +23,18 @@ module supra_rule::supra_registry {
     };
     let supra_registry_cap = SupraRegistryCap {
       id: object::new(ctx),
-      for: object::id(&supra_registry)
+      for_registry: object::id(&supra_registry)
     };
     transfer::share_object(supra_registry);
     transfer::transfer(supra_registry_cap, tx_context::sender(ctx));
   }
 
-  public entry fun register_supra_pair_id<CoinType>(
+  public fun register_supra_pair_id<CoinType>(
     supra_registry: &mut SupraRegistry,
     supra_registry_cap: &SupraRegistryCap,
     pair_id: u32,
   ) {
-    assert!(object::id(supra_registry) == supra_registry_cap.for, ERR_ILLEGAL_REGISTRY_CAP);
+    assert!(object::id(supra_registry) == supra_registry_cap.for_registry, ERR_ILLEGAL_REGISTRY_CAP);
     let coin_type = type_name::get<CoinType>();
     if (table::contains(&supra_registry.table, coin_type)) {
       table::remove<TypeName, u32>(&mut supra_registry.table, coin_type);
@@ -45,7 +42,7 @@ module supra_rule::supra_registry {
     table::add(&mut supra_registry.table, coin_type, pair_id);
   }
 
-  public entry fun get_supra_pair_id<CoinType>(
+  public fun get_supra_pair_id<CoinType>(
     supra_registry: &SupraRegistry,
   ): u32 {
     let coin_type = type_name::get<CoinType>();

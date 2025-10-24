@@ -45,18 +45,6 @@ public(package) fun decrease(
     }
 }
 
-public(package) fun has_coin_x_as_collateral(
-    collaterals: &WitTable<ObligationCollaterals, TypeName, Collateral>,
-    coin_type: TypeName,
-): bool {
-    if (wit_table::contains(collaterals, coin_type)) {
-        let collateral_amount = collateral(collaterals, coin_type);
-        collateral_amount > 0
-    } else {
-        false
-    }
-}
-
 public fun collateral(
     collaterals: &WitTable<ObligationCollaterals, TypeName, Collateral>,
     type_name: TypeName,

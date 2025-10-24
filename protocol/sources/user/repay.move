@@ -32,7 +32,7 @@ public struct RepayEvent has copy, drop {
 /// @param clock The SUI system clock object, used to get current timestamp
 /// @param ctx The SUI transaction context object
 /// @custom:T The type of asset that user wants to repay
-public entry fun repay<T>(
+public fun repay<T>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,

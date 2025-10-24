@@ -1,24 +1,12 @@
 [package]
 name = "SupraRule"
 version = "0.0.1"
+edition = "2024"
 
-[dependencies.Sui]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/sui-framework"
-rev = "testnet"
-override = true
+[dependencies]
+SupraOracle = { git = "https://github.com/Entropy-Foundation/dora-interface", subdir = "sui/testnet/supra_holder", rev = "testnet" }
+XOracle = {local = "../x_oracle"}
 
-[dependencies.MoveStdlib]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/move-stdlib"
-rev = "testnet"
-override = true
-
-[dependencies.SupraOracle]
-local = "./vendors/supra_oracle"
-
-[dependencies.XOracle]
-local = "../x_oracle"
 
 [addresses]
 supra_rule = "0x0"

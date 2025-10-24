@@ -19,7 +19,6 @@ const FLASH_LOAN_FEE_DEN: u64 = 1000;
 const FLASH_LOAN_FEE_NUM: u64 = 1;
 
 public struct BalanceSheet has copy, store {
-    cash: u64,
     debt: u64,
     revenue: u64,
     market_coin_supply: u64,
@@ -53,13 +52,8 @@ public fun asset_types(self: &Reserve): vector<TypeName> {
     wit_table::keys(&self.balance_sheets)
 }
 
-public fun balance_sheet(balance_sheet: &BalanceSheet): (u64, u64, u64, u64) {
-    (
-        balance_sheet.cash,
-        balance_sheet.debt,
-        balance_sheet.revenue,
-        balance_sheet.market_coin_supply,
-    )
+public fun balance_sheet(balance_sheet: &BalanceSheet): (u64, u64, u64) {
+    (balance_sheet.debt, balance_sheet.revenue, balance_sheet.market_coin_supply)
 }
 
 public(package) fun new(ctx: &mut TxContext): Reserve {
@@ -74,7 +68,7 @@ public(package) fun new(ctx: &mut TxContext): Reserve {
 public(package) fun register_coin<T>(self: &mut Reserve) {
     supply_bag::init_supply(MarketCoin<T> {}, &mut self.market_coin_supplies);
     balance_bag::init_balance<T>(&mut self.underlying_balances);
-    let balance_sheet = BalanceSheet { cash: 0, debt: 0, revenue: 0, market_coin_supply: 0 };
+    let balance_sheet = BalanceSheet { debt: 0, revenue: 0, market_coin_supply: 0 };
     wit_table::add(BalanceSheets {}, &mut self.balance_sheets, get<T>(), balance_sheet);
 }
 
@@ -120,9 +114,6 @@ public(package) fun handle_repay<T>(self: &mut Reserve, coin: Coin<COIN_GUSD>): 
         balance_sheet.revenue = balance_sheet.revenue + interest_to_keep;
     };
 
-    // update cash
-    balance_sheet.cash = balance_sheet.cash + repay_amount;
-
     // split the balance into debt part and interest part
     let debt_balance = balance::split(&mut balance, debt_to_burn);
     let interest_balance = balance; // interest part
@@ -138,15 +129,13 @@ public(package) fun handle_repay<T>(self: &mut Reserve, coin: Coin<COIN_GUSD>): 
     return debt_balance
 }
 
-public(package) fun handle_borrow<T>(self: &mut Reserve, amount: u64): Balance<T> {
-    let balance_sheet = wit_table::borrow_mut(BalanceSheets {}, &mut self.balance_sheets, get<T>());
-    assert!(balance_sheet.cash >= amount, error::reserve_not_enough_error());
-    balance_sheet.cash = balance_sheet.cash - amount;
+public(package) fun handle_borrow<COIN_GUSD>(self: &mut Reserve, amount: u64) {
+    let balance_sheet = wit_table::borrow_mut(
+        BalanceSheets {},
+        &mut self.balance_sheets,
+        get<COIN_GUSD>(),
+    );
     balance_sheet.debt = balance_sheet.debt + amount;
-
-    assert!(balance_sheet.cash >= balance_sheet.revenue, error::pool_liquidity_not_enough_error());
-
-    balance_bag::split<T>(&mut self.underlying_balances, amount)
 }
 
 public(package) fun handle_liquidation<T>(
@@ -170,7 +159,6 @@ public(package) fun handle_liquidation<T>(
     if (interest_to_keep > 0) {
         balance_sheet.revenue = balance_sheet.revenue + interest_to_keep;
     };
-    balance_sheet.cash = balance_sheet.cash + total_amount;
 
     // split the repay_balance into principal part and interest part
     let principal_balance = balance::split(&mut repay_balance, debt_to_burn);
@@ -193,7 +181,6 @@ public(package) fun take_revenue<T>(self: &mut Reserve, amount: u64, ctx: &mut T
     let take_amount = math::min(amount, all_revenue);
 
     balance_sheet.revenue = balance_sheet.revenue - take_amount;
-    balance_sheet.cash = balance_sheet.cash - take_amount;
 
     let balance = balance_bag::split<T>(&mut self.underlying_balances, take_amount);
     coin::from_balance(balance, ctx)

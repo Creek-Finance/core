@@ -1,6 +1,5 @@
 module protocol::interest_model;
 
-use math::fixed_point32_empower;
 use protocol::error;
 use std::fixed_point32::{Self, FixedPoint32};
 use std::type_name::{TypeName, get};

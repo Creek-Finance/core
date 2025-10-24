@@ -152,16 +152,8 @@ public(package) fun decrease_debt(self: &mut Obligation, type_name: TypeName, am
     obligation_debts::decrease(&mut self.debts, type_name, amount);
 }
 
-public fun has_coin_x_as_debt(self: &Obligation, coin_type: TypeName): bool {
-    obligation_debts::has_coin_x_as_debt(&self.debts, coin_type)
-}
-
 public fun debt(self: &Obligation, type_name: TypeName): (u64, u64) {
     obligation_debts::debt(&self.debts, type_name)
-}
-
-public fun has_coin_x_as_collateral(self: &Obligation, coin_type: TypeName): bool {
-    obligation_collaterals::has_coin_x_as_collateral(&self.collaterals, coin_type)
 }
 
 public fun collateral(self: &Obligation, type_name: TypeName): u64 {

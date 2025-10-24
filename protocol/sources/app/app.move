@@ -108,18 +108,18 @@ public fun extend_limiter_change_delay(admin_cap: &mut AdminCap, delay: u64) {
 
 /// ===== Emergency pause controls =====
 /// Manually pause the protocol. Only admin can call.
-public entry fun pause_protocol(_admin_cap: &AdminCap, market: &mut Market) {
+public fun pause_protocol(_admin_cap: &AdminCap, market: &mut Market) {
     market::set_paused(market, true);
 }
 
 /// Manually resume the protocol. Only admin can call.
-public entry fun resume_protocol(_admin_cap: &AdminCap, market: &mut Market) {
+public fun resume_protocol(_admin_cap: &AdminCap, market: &mut Market) {
     market::set_paused(market, false);
 }
 
 /// Anyone can call. If GUSD price deviates from 1 by >= 0.8%, auto-pause protocol.
 /// Deviation threshold: 0.008
-public entry fun check_and_pause_if_gusd_depeg(
+public fun check_and_pause_if_gusd_depeg(
     market: &mut Market,
     x_oracle: &XOracle,
     clock: &Clock,
@@ -141,11 +141,11 @@ public entry fun check_and_pause_if_gusd_depeg(
 }
 
 /// ===== Auto-pause configuration =====
-public entry fun set_auto_pause_enabled(_admin_cap: &AdminCap, market: &mut Market, enabled: bool) {
+public fun set_auto_pause_enabled(_admin_cap: &AdminCap, market: &mut Market, enabled: bool) {
     market::set_auto_pause_enabled(market, enabled);
 }
 
-public entry fun set_auto_pause_threshold(
+public fun set_auto_pause_threshold(
     _admin_cap: &AdminCap,
     market: &mut Market,
     numerator: u64,
@@ -245,7 +245,7 @@ public fun create_risk_model_change<T>(
     risk_model_change
 }
 
-public entry fun add_risk_model<T>(
+public fun add_risk_model<T>(
     market: &mut Market,
     admin_cap: &AdminCap,
     risk_model_change: OneTimeLockValue<RiskModel>,
@@ -255,7 +255,7 @@ public entry fun add_risk_model<T>(
     market::register_collateral<T>(market);
 }
 
-public entry fun update_risk_model<T>(
+public fun update_risk_model<T>(
     market: &mut Market,
     admin_cap: &AdminCap,
     risk_model_change: OneTimeLockValue<RiskModel>,
@@ -270,7 +270,7 @@ public entry fun update_risk_model<T>(
     );
 }
 
-public entry fun add_limiter<T>(
+public fun add_limiter<T>(
     _admin_cap: &AdminCap,
     market: &mut Market,
     outflow_limit: u64,
@@ -316,7 +316,7 @@ public fun create_limiter_limit_change<T>(
 }
 
 #[allow(unused_type_parameter)]
-public entry fun apply_limiter_limit_change<T>(
+public fun apply_limiter_limit_change<T>(
     _admin_cap: &AdminCap,
     market: &mut Market,
     one_time_lock_value: OneTimeLockValue<LimiterUpdateLimitChange>,
@@ -331,7 +331,7 @@ public entry fun apply_limiter_limit_change<T>(
 }
 
 #[allow(unused_type_parameter)]
-public entry fun apply_limiter_params_change<T>(
+public fun apply_limiter_params_change<T>(
     _admin_cap: &AdminCap,
     market: &mut Market,
     one_time_lock_value: OneTimeLockValue<LimiterUpdateParamsChange>,
@@ -346,7 +346,7 @@ public entry fun apply_limiter_params_change<T>(
 }
 
 /// ======= management of asset active state =======
-public entry fun set_base_asset_active_state<T>(
+public fun set_base_asset_active_state<T>(
     _admin_cap: &AdminCap,
     market: &mut Market,
     is_active: bool,
@@ -354,7 +354,7 @@ public entry fun set_base_asset_active_state<T>(
     market::set_base_asset_active_state<T>(market, is_active);
 }
 
-public entry fun set_collateral_active_state<T>(
+public fun set_collateral_active_state<T>(
     _admin_cap: &AdminCap,
     market: &mut Market,
     is_active: bool,
@@ -363,7 +363,7 @@ public entry fun set_collateral_active_state<T>(
 }
 
 /// ======= take revenue =======
-public entry fun take_revenue<T>(
+public fun take_revenue<T>(
     admin_cap: &AdminCap,
     market: &mut Market,
     amount: u64,
@@ -382,7 +382,7 @@ public entry fun take_revenue<T>(
 }
 
 /// ======= take borrow fee =======
-public entry fun take_borrow_fee<T>(
+public fun take_borrow_fee<T>(
     admin_cap: &AdminCap,
     market: &mut Market,
     amount: u64,
@@ -401,7 +401,7 @@ public entry fun take_borrow_fee<T>(
 }
 
 /// ======= staking fee (XAUM) =======
-public entry fun update_staking_fee(
+public fun update_staking_fee(
     _admin_cap: &AdminCap,
     manager: &mut StakingManager,
     fee_numerator: u64,
@@ -412,7 +412,7 @@ public entry fun update_staking_fee(
     staking_manager::update_stake_fee(manager, fee_numerator, fee_denominator, ctx);
 }
 
-public entry fun update_unstaking_fee(
+public fun update_unstaking_fee(
     _admin_cap: &AdminCap,
     manager: &mut StakingManager,
     fee_numerator: u64,
@@ -423,7 +423,7 @@ public entry fun update_unstaking_fee(
     staking_manager::update_unstake_fee(manager, fee_numerator, fee_denominator, ctx);
 }
 
-public entry fun take_staking_fee(
+public fun take_staking_fee(
     admin_cap: &AdminCap,
     manager: &mut StakingManager,
     amount: u64,
@@ -442,35 +442,35 @@ public entry fun take_staking_fee(
 }
 
 /// ======= Management of obligation access keys
-public entry fun add_lock_key<T: drop>(
+public fun add_lock_key<T: drop>(
     _admin_cap: &AdminCap,
     obligation_access_store: &mut ObligationAccessStore,
 ) {
     obligation_access::add_lock_key<T>(obligation_access_store);
 }
 
-public entry fun remove_lock_key<T: drop>(
+public fun remove_lock_key<T: drop>(
     _admin_cap: &AdminCap,
     obligation_access_store: &mut ObligationAccessStore,
 ) {
     obligation_access::remove_lock_key<T>(obligation_access_store);
 }
 
-public entry fun add_reward_key<T: drop>(
+public fun add_reward_key<T: drop>(
     _admin_cap: &AdminCap,
     obligation_access_store: &mut ObligationAccessStore,
 ) {
     obligation_access::add_reward_key<T>(obligation_access_store);
 }
 
-public entry fun remove_reward_key<T: drop>(
+public fun remove_reward_key<T: drop>(
     _admin_cap: &AdminCap,
     obligation_access_store: &mut ObligationAccessStore,
 ) {
     obligation_access::remove_reward_key<T>(obligation_access_store);
 }
 
-public entry fun update_borrow_fee<T: drop>(
+public fun update_borrow_fee<T: drop>(
     _admin_cap: &AdminCap,
     market: &mut Market,
     fee_numerator: u64,
@@ -486,19 +486,19 @@ public entry fun update_borrow_fee<T: drop>(
     dynamic_field::add(market_uid_mut, key, fee);
 }
 
-public entry fun update_borrow_limit<T: drop>(
+public fun update_borrow_limit<T: drop>(
     _admin_cap: &AdminCap,
     market: &mut Market,
-    limit_amount: u64,
+    limit_amount: u128,
 ) {
     let market_uid_mut = market::uid_mut(market);
     let key = market_dynamic_keys::borrow_limit_key(type_name::get<T>());
 
-    dynamic_field::remove_if_exists<BorrowLimitKey, u64>(market_uid_mut, key);
+    dynamic_field::remove_if_exists<BorrowLimitKey, u128>(market_uid_mut, key);
     dynamic_field::add(market_uid_mut, key, limit_amount);
 }
 
-public entry fun set_gusd_cap(
+public fun set_gusd_cap(
     _admin_cap: &AdminCap,
     market: &mut Market,
     gusd_cap: TreasuryCap<COIN_GUSD>,
@@ -506,7 +506,7 @@ public entry fun set_gusd_cap(
     market::set_gusd_cap(market, gusd_cap);
 }
 
-public entry fun update_reward_address(
+public fun update_reward_address(
     admin_cap: &mut AdminCap,
     new_address: address,
     ctx: &mut TxContext,
@@ -520,11 +520,11 @@ public entry fun update_reward_address(
     });
 }
 
-public entry fun transfer_admin_cap(admin_cap: AdminCap, new_admin: address) {
+public fun transfer_admin_cap(admin_cap: AdminCap, new_admin: address) {
     transfer::transfer(admin_cap, new_admin);
 }
 
-public entry fun set_flash_loan_single_cap(
+public fun set_flash_loan_single_cap(
     _admin_cap: &AdminCap,
     market: &mut Market,
     single_cap: u64,

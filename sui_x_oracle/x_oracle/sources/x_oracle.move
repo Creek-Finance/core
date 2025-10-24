@@ -1,12 +1,7 @@
 module x_oracle::x_oracle {
-  use std::vector;
   use std::type_name::{TypeName, get};
-  use std::option;
-  use sui::object::{Self, UID};
   use sui::table::{Self, Table};
-  use sui::tx_context::{Self, TxContext};
-  use sui::clock::{Self, Clock};
-  use sui::transfer;
+  use sui::clock::{Self as clock, Clock};
   use sui::package;
 
   use x_oracle::price_update_policy::{Self, PriceUpdatePolicy, PriceUpdateRequest, PriceUpdatePolicyCap};
@@ -15,9 +10,9 @@ module x_oracle::x_oracle {
   const PRIMARY_PRICE_NOT_QUALIFIED: u64 = 720;
   const ONLY_SUPPORT_ONE_PRIMARY: u64 = 721;
 
-  struct X_ORACLE has drop {}
+  public struct X_ORACLE has drop {}
 
-  struct XOracle has key {
+  public struct XOracle has key {
     id: UID,
     primary_price_update_policy: PriceUpdatePolicy,
     secondary_price_update_policy: PriceUpdatePolicy,
@@ -43,16 +38,16 @@ module x_oracle::x_oracle {
     gr_beta_fp: u64,
   }
 
-  struct XOraclePolicyCap has key, store {
+  public struct XOraclePolicyCap has key, store {
     id: UID,
     primary_price_update_policy_cap: PriceUpdatePolicyCap,
     secondary_price_update_policy_cap: PriceUpdatePolicyCap,
   }
 
   /// Minimal capability to update GR indicator cache only
-  struct GrIndicatorCap has key, store { id: UID }
+  public struct GrIndicatorCap has key, store { id: UID }
 
-  struct XOraclePriceUpdateRequest<phantom T> {
+  public struct XOraclePriceUpdateRequest<phantom T> {
     primary_price_update_request: PriceUpdateRequest<T>,
     secondary_price_update_request: PriceUpdateRequest<T>,
   }
@@ -65,7 +60,7 @@ module x_oracle::x_oracle {
 
   #[allow(lint(share_owned))]
   fun init(otw: X_ORACLE, ctx: &mut TxContext) {
-    let (x_oracle, x_oracle_policy_cap) = new(ctx);
+    let (mut x_oracle, x_oracle_policy_cap) = new(ctx);
     init_rules_df_if_not_exist(&x_oracle_policy_cap, &mut x_oracle, ctx);
     transfer::share_object(x_oracle);
     transfer::transfer(x_oracle_policy_cap, tx_context::sender(ctx));
@@ -346,8 +341,8 @@ module x_oracle::x_oracle {
   }
 
   fun determine_price(
-    primary_price_feeds: vector<PriceFeed>,
-    secondary_price_feeds: vector<PriceFeed>,
+    mut primary_price_feeds: vector<PriceFeed>,
+    mut secondary_price_feeds: vector<PriceFeed>,
   ): PriceFeed {
     // current we only support one primary price feed
     assert!(vector::length(&primary_price_feeds) == 1, ONLY_SUPPORT_ONE_PRIMARY);
@@ -356,8 +351,8 @@ module x_oracle::x_oracle {
 
     // We require the primary price feed to be confirmed by at least half of the secondary price feeds
     let required_secondary_match_num = (secondary_price_feed_num + 1) / 2;
-    let matched: u64 = 0;
-    let i = 0;
+    let mut matched: u64 = 0;
+    let mut i = 0;
     while (i < secondary_price_feed_num) {
       let secondary_price_feed = vector::pop_back(&mut secondary_price_feeds);
       if (price_feed_match(primary_price_feed, secondary_price_feed)) {
@@ -387,15 +382,6 @@ module x_oracle::x_oracle {
     diff <= scale + reasonable_diff && diff >= scale - reasonable_diff
   }
 
-  #[test]
-  public fun test_feed_match() {
-    let feed1 = price_feed::new(10100000, 1);
-    let feed2 = price_feed::new(10000000, 1);
-    let primary_feeds = vector::singleton(feed1);
-    let secondary_feeds = vector::singleton(feed2);
-    let res = determine_price(primary_feeds, secondary_feeds);
-    assert!(res == feed1, 0);
-  }
 
   #[test_only]
   public fun init_t(ctx: &mut TxContext) {

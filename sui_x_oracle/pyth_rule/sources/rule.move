@@ -16,7 +16,7 @@ module pyth_rule::rule {
 
   const PYTH_PRICE_DECIMALS_TOO_LARGE: u64 = 0x11204;
 
-  struct Rule has drop {}
+  public struct Rule has drop {}
 
 
   public fun set_price_as_primary<CoinType>(

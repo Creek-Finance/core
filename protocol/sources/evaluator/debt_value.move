@@ -8,7 +8,6 @@ use protocol::obligation::{Self, Obligation};
 use protocol::price::get_price;
 use protocol::value_calculator::usd_value;
 use std::fixed_point32::FixedPoint32;
-use std::vector;
 use sui::clock::Clock;
 use x_oracle::x_oracle::XOracle;
 

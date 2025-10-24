@@ -12,13 +12,7 @@ use std::fixed_point32::{Self, FixedPoint32};
 use sui::balance::{Self, Balance, Supply};
 use sui::coin::{Self, Coin, TreasuryCap};
 use sui::event;
-
-/// Error codes.
-const E_INSUFFICIENT_XAUM: u64 = 1;
-const E_INSUFFICIENT_GR_GY: u64 = 2;
-const E_MISMATCHED_AMOUNTS: u64 = 5;
-const E_NOT_ADMIN: u64 = 6;
-const E_INVALID_PARAMS: u64 = 7;
+use protocol::error;
 
 /// Minimum stake amount: 0.001 XAUM (with 9 decimals).
 const MIN_STAKE_AMOUNT: u64 = 1_000_000;
@@ -70,7 +64,7 @@ public struct ManagerCreated has copy, drop {
 
 /// Initializes a new StakingManager with GR and GY TreasuryCaps.
 /// The TreasuryCaps are converted to Supply and stored internally.
-public entry fun init_staking_manager(
+public fun init_staking_manager(
     gr_treasury_cap: TreasuryCap<COIN_GR>,
     gy_treasury_cap: TreasuryCap<COIN_GY>,
     ctx: &mut TxContext,
@@ -102,18 +96,18 @@ public entry fun init_staking_manager(
 }
 
 /// Stakes XAUM in exchange for GR and GY at the fixed exchange rate.
-public entry fun stake_xaum(
+public fun stake_xaum(
     manager: &mut StakingManager,
     xaum_coin: Coin<COIN_XAUM>,
     ctx: &mut TxContext,
 ) {
     let user = tx_context::sender(ctx);
     let xaum_amount = coin::value(&xaum_coin);
-    assert!(xaum_amount >= MIN_STAKE_AMOUNT, E_INSUFFICIENT_XAUM);
+    assert!(xaum_amount >= MIN_STAKE_AMOUNT, error::staking_min_xaum_error());
 
     // staking fee
     let fee_amount = fixed_point32::multiply_u64(xaum_amount, manager.stake_fee_rate);
-    assert!(xaum_amount > fee_amount, E_INSUFFICIENT_XAUM);
+    assert!(xaum_amount > fee_amount, error::staking_fee_exceeds_amount_error());
 
     let mut xaum_balance = coin::into_balance(xaum_coin);
     let fee_balance = balance::split(&mut xaum_balance, fee_amount);
@@ -142,7 +136,7 @@ public entry fun stake_xaum(
 }
 
 /// Unstakes by burning GR and GY to redeem XAUM.
-public entry fun unstake(
+public fun unstake(
     manager: &mut StakingManager,
     gr_coin: Coin<COIN_GR>,
     gy_coin: Coin<COIN_GY>,
@@ -152,13 +146,13 @@ public entry fun unstake(
     let gr_amount = coin::value(&gr_coin);
     let gy_amount = coin::value(&gy_coin);
 
-    assert!(gr_amount == gy_amount, E_MISMATCHED_AMOUNTS);
+    assert!(gr_amount == gy_amount, error::staking_gr_gy_mismatch_error());
 
     let min_gr_gy_amount = MIN_STAKE_AMOUNT * EXCHANGE_RATE;
-    assert!(gr_amount >= min_gr_gy_amount, E_INSUFFICIENT_GR_GY);
+    assert!(gr_amount >= min_gr_gy_amount, error::staking_insufficient_gr_gy_error());
 
     let xaum_return_amount = gr_amount / EXCHANGE_RATE;
-    assert!(balance::value(&manager.xaum_pool) >= xaum_return_amount, E_INSUFFICIENT_XAUM);
+    assert!(balance::value(&manager.xaum_pool) >= xaum_return_amount, error::staking_pool_xaum_not_enough_error());
 
     // Burn GR and GY tokens using internal supply objects
     coin_gr::burn_to_supply(&mut manager.gr_supply, gr_coin);
@@ -167,7 +161,7 @@ public entry fun unstake(
     // Unstaking fee: deducted from the XAUM returned to user
     let mut xaum_balance = balance::split(&mut manager.xaum_pool, xaum_return_amount);
     let unstake_fee_amount = fixed_point32::multiply_u64(xaum_return_amount, manager.unstake_fee_rate);
-    assert!(xaum_return_amount > unstake_fee_amount, E_INSUFFICIENT_XAUM);
+    assert!(xaum_return_amount > unstake_fee_amount, error::staking_fee_exceeds_amount_error());
     if (unstake_fee_amount > 0) {
         let fee_part = balance::split(&mut xaum_balance, unstake_fee_amount);
         balance::join(&mut manager.xaum_fee_pool, fee_part);
@@ -193,13 +187,23 @@ public fun get_admin(manager: &StakingManager): address {
     manager.admin
 }
 
+/// Returns the total supply of GR tokens.
+public fun get_gr_total_supply(manager: &StakingManager): u64 {
+    balance::supply_value(&manager.gr_supply)
+}
+
+/// Returns the total supply of GY tokens.
+public fun get_gy_total_supply(manager: &StakingManager): u64 {
+    balance::supply_value(&manager.gy_supply)
+}
+
 /// Returns the XAUM fee pool balance.
 public fun get_fee_pool_balance(manager: &StakingManager): u64 {
     balance::value(&manager.xaum_fee_pool)
 }
 
-/// Entry view for fee pool balance (for devInspect to read return value)
-public entry fun read_fee_pool_balance(manager: &StakingManager): u64 {
+/// View for fee pool balance (for devInspect to read return value)
+public fun read_fee_pool_balance(manager: &StakingManager): u64 {
     balance::value(&manager.xaum_fee_pool)
 }
 
@@ -211,36 +215,36 @@ public struct TakeStakeFeeEvent has copy, drop {
 }
 
 /// Update staking fee rate (numerator/denominator) by admin
-public entry fun update_stake_fee(
+public fun update_stake_fee(
     manager: &mut StakingManager,
     numerator: u64,
     denominator: u64,
     ctx: &mut TxContext,
 ) {
-    assert!(tx_context::sender(ctx) == manager.admin, E_NOT_ADMIN);
-    assert!(denominator > 0 && numerator <= denominator, E_INVALID_PARAMS);
+    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
+    assert!(denominator > 0 && numerator <= denominator, error::staking_invalid_params_error());
     manager.stake_fee_rate = fixed_point32::create_from_rational(numerator, denominator);
 }
 
 /// Update unstaking fee rate (numerator/denominator) by admin
-public entry fun update_unstake_fee(
+public fun update_unstake_fee(
     manager: &mut StakingManager,
     numerator: u64,
     denominator: u64,
     ctx: &mut TxContext,
 ) {
-    assert!(tx_context::sender(ctx) == manager.admin, E_NOT_ADMIN);
-    assert!(denominator > 0 && numerator <= denominator, E_INVALID_PARAMS);
+    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
+    assert!(denominator > 0 && numerator <= denominator, error::staking_invalid_params_error());
     manager.unstake_fee_rate = fixed_point32::create_from_rational(numerator, denominator);
 }
 
 /// Take staking XAUM fee from the fee pool by admin
-public entry fun take_stake_fee(
+public fun take_stake_fee(
     manager: &mut StakingManager,
     amount: u64,
     ctx: &mut TxContext,
 ) {
-    assert!(tx_context::sender(ctx) == manager.admin, E_NOT_ADMIN);
+    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
     let fee_part = balance::split(&mut manager.xaum_fee_pool, amount);
     let fee_coin = coin::from_balance(fee_part, ctx);
 
@@ -262,4 +266,57 @@ public fun take_stake_fee_coin(
 ): Coin<COIN_XAUM> {
     let fee_part = balance::split(&mut manager.xaum_fee_pool, amount);
     coin::from_balance(fee_part, ctx)
+}
+
+/// Event emitted when owner withdraws XAUM from pool
+public struct OwnerWithdrawXAUMEvent has copy, drop {
+    manager: ID,
+    amount: u64,
+    sender: address,
+}
+
+/// Event emitted when owner deposits XAUM back to pool
+public struct OwnerDepositXAUMEvent has copy, drop {
+    manager: ID,
+    amount: u64,
+    sender: address,
+}
+
+/// Owner-only: withdraw XAUM from staking pool to owner wallet
+public fun owner_withdraw_xaum(
+    manager: &mut StakingManager,
+    amount: u64,
+    ctx: &mut TxContext,
+) {
+    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
+    assert!(balance::value(&manager.xaum_pool) >= amount, error::staking_pool_xaum_not_enough_error());
+
+    let part = balance::split(&mut manager.xaum_pool, amount);
+    let coin_out = coin::from_balance(part, ctx);
+
+    event::emit(OwnerWithdrawXAUMEvent {
+        manager: object::id(manager),
+        amount,
+        sender: tx_context::sender(ctx),
+    });
+
+    transfer::public_transfer(coin_out, tx_context::sender(ctx));
+}
+
+/// Owner-only: deposit XAUM from owner wallet into staking pool
+public fun owner_deposit_xaum(
+    manager: &mut StakingManager,
+    xaum_coin: Coin<COIN_XAUM>,
+    ctx: &mut TxContext,
+) {
+    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
+    let xaum_balance = coin::into_balance(xaum_coin);
+    let amount = balance::value(&xaum_balance);
+    balance::join(&mut manager.xaum_pool, xaum_balance);
+
+    event::emit(OwnerDepositXAUMEvent {
+        manager: object::id(manager),
+        amount,
+        sender: tx_context::sender(ctx),
+    });
 }

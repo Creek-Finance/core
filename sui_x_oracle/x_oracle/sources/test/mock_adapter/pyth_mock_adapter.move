@@ -3,7 +3,7 @@ module x_oracle::pyth_mock_adapter {
     use x_oracle::price_feed;
     use x_oracle::x_oracle::XOraclePriceUpdateRequest;
 
-    struct PythRule has drop {}
+    public struct PythRule has drop {}
 
     #[test_only]
     public fun update_price_as_primary<CoinType>(

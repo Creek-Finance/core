@@ -1,13 +1,6 @@
 module xaum_indicator_core::xaum_indicator_core {
-    use std::vector;
-    use std::option;
-    use std::type_name::{Self, TypeName, with_defining_ids};
-    use std::u64;
-    use std::u256;
+    use std::type_name::{TypeName, with_defining_ids};
     use sui::clock::{Self as clock, Clock};
-    use sui::object::{Self, UID, ID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
     use sui::dynamic_object_field;
     use sui::sui::SUI;
 
@@ -18,7 +11,7 @@ module xaum_indicator_core::xaum_indicator_core {
         id: UID,
         asset_type: TypeName,
         // Optional bound Pyth price feed object id; set by adapter on non-local networks
-        pyth_feed_id: option::Option<ID>,
+        pyth_feed_id: Option<ID>,
         latest_price: u256,
         price_history: vector<u256>,
         average_price: u256,
@@ -56,6 +49,25 @@ module xaum_indicator_core::xaum_indicator_core {
     fun init(ctx: &mut TxContext) {
         let storage = create_price_storage(ctx);
         transfer::share_object(storage);
+    }
+
+    /// Initialize EMA values with custom starting values (18-decimal precision)
+    /// Can only be called once when ema_initialized is false
+    public fun init_ema_values(
+        storage: &mut PriceStorage,
+        ema120_initial: u256,
+        ema90_initial: u256,
+        ema5_initial: u256,
+        _ctx: &mut TxContext,
+    ) {
+        assert!(!storage.ema_initialized, 0);
+        storage.ema120_current = ema120_initial;
+        storage.ema120_previous = ema120_initial;
+        storage.ema90_current = ema90_initial;
+        storage.ema90_previous = ema90_initial;
+        storage.ema5_current = ema5_initial;
+        storage.ema5_previous = ema5_initial;
+        storage.ema_initialized = true;
     }
 
     // Manual price setter (9-decimals) for local/general usage

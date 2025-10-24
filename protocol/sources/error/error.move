@@ -22,10 +22,9 @@ module protocol::error {
   // borrow
   public fun borrow_too_much_error(): u64 { 0x0000501 }
   public fun borrow_too_small_error(): u64 { 0x0000502 }
-  public fun unable_to_borrow_a_collateral_coin(): u64 { 0x0000503 }
-  public fun invalid_coin_type(): u64 { 0x0000504 }
-  public fun flash_loan_repay_not_enough_error(): u64 { 0x0000505 }
-  public fun flashloan_exceed_single_cap_error(): u64 { 0x0000506 }
+  public fun invalid_coin_type(): u64 { 0x0000503 }
+  public fun flash_loan_repay_not_enough_error(): u64 { 0x0000504 }
+  public fun flashloan_exceed_single_cap_error(): u64 { 0x0000505 }
 
   // liquidation
   public fun unable_to_liquidate_error(): u64 { 0x0000601 }
@@ -34,7 +33,6 @@ module protocol::error {
   public fun max_collateral_reached_error(): u64 { 0x0000701 }
   public fun invalid_collateral_type_error(): u64 { 0x0000702 }
   public fun withdraw_collateral_too_much_error(): u64 { 0x0000703 }
-  public fun unable_to_deposit_a_borrowed_coin(): u64 { 0x0000704 }
 
   // admin
   public fun interest_model_type_not_match_error(): u64 { 0x0000901 }
@@ -53,14 +51,23 @@ module protocol::error {
   public fun interest_model_param_error(): u64 { 0x0013002 }
 
   // pool liquidity errors
-  public fun pool_liquidity_not_enough_error(): u64 { 0x0014001 }
-  public fun collateral_not_enough(): u64 { 0x0014002 }
-  public fun reserve_not_enough_error(): u64 { 0x0014003 }
-  public fun borrow_limit_reached_error(): u64 { 0x0014004 }
+  public fun collateral_not_enough(): u64 { 0x0014001 }
+  public fun borrow_limit_reached_error(): u64 { 0x0014002 }
 
   // repay
   public fun zero_repay_amount_error(): u64 { 0x0015001 }
 
   // market
   public fun market_paused_error(): u64 { 0x0016001 }
+
+  // staking
+  public fun staking_min_xaum_error(): u64 { 0x0017001 }
+  public fun staking_gr_gy_mismatch_error(): u64 { 0x0017002 }
+  public fun staking_insufficient_gr_gy_error(): u64 { 0x0017003 }
+  public fun staking_not_admin_error(): u64 { 0x0017004 }
+  public fun staking_invalid_params_error(): u64 { 0x0017005 }
+  // XAUM pool not enough when users try to unstake or owner withdraws
+  public fun staking_pool_xaum_not_enough_error(): u64 { 0x0017006 }
+  // Fee exceeds or equals amount which makes net amount non-positive
+  public fun staking_fee_exceeds_amount_error(): u64 { 0x0017007 }
 }

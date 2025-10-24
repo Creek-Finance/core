@@ -1,20 +1,17 @@
 module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
-    use std::option;
     use std::u64;
     use std::u256;
-    use sui::clock::{Self as clock, Clock};
-    use sui::tx_context::{Self, TxContext};
+    use sui::clock::Clock;
     use sui::sui::SUI;
-    use std::type_name::{Self, TypeName, with_defining_ids};
+    use std::type_name::with_defining_ids;
 
     use pyth::i64::{Self as i64, I64};
-    use pyth::price::{Self as price, Price};
+    use pyth::price::{Self as price};
     use pyth::price_info::PriceInfoObject;
     use pyth::pyth;
 
-    use x_oracle::x_oracle::{Self as x_oracle_mod, XOracle, GrIndicatorCap};
+    use x_oracle::x_oracle::XOracle;
     use xaum_indicator_core::xaum_indicator_core::{Self as core, PriceStorage};
-    use sui::object::{Self as object, ID};
 
     const ERR_NOT_SUI_STORAGE: u64 = 0xEA01;
     const ERR_FEED_ALREADY_INITIALIZED: u64 = 0xEA02;
@@ -25,7 +22,7 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
     public fun init_feed(
         storage: &mut PriceStorage,
         price_info_object: &PriceInfoObject,
-        _ctx: &mut TxContext,
+        _ctx: &mut tx_context::TxContext,
     ) {
         // Bind feed id via core helper to avoid accessing private fields
         assert!(!core::is_pyth_feed_bound(storage), ERR_FEED_ALREADY_INITIALIZED);
@@ -35,13 +32,13 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
 
     // no extra types
 
-    /// Pull price from Pyth, convert to 18-decimal u256, update core, then push EMA120 to XOracle
-    public fun update_sui_price(
+    /// Pull XAUM price from Pyth, convert to 18-decimal u256, update core, then push EMA120 to XOracle
+    public fun update_xaum_price(
         storage: &mut PriceStorage,
         price_info_object: &PriceInfoObject,
         x_oracle: &mut XOracle,
         clock: &Clock,
-        _ctx: &mut TxContext,
+        _ctx: &mut tx_context::TxContext,
     ) {
         assert!(with_defining_ids<SUI>() == core::get_asset_type(storage), ERR_NOT_SUI_STORAGE);
         // Verify feed binding

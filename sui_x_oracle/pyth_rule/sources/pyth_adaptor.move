@@ -8,8 +8,6 @@ module pyth_rule::pyth_adaptor {
   use pyth::state::{State as PythState};
   use pyth::price_info::{PriceInfoObject};
 
-  friend pyth_rule::rule;
-
   use pyth_rule::pyth_registry::{Self, PythFeedData};
 
   const U8_MAX: u64 = 255;
@@ -19,7 +17,7 @@ module pyth_rule::pyth_adaptor {
   const PYTH_PRICE_TOO_NEW: u64 = 0x11203;
   const PYTH_PRICE_CONF_TOO_LARGE: u64 = 0x11299;
 
-  public(friend) fun get_pyth_price(
+  public(package) fun get_pyth_price(
     pyth_state: &PythState,
     pyth_price_info_object: &PriceInfoObject,
     pyth_feed_data: &PythFeedData,

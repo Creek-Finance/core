@@ -19,18 +19,7 @@ use sui::coin::{Self, Coin};
 use sui::event::emit;
 use x_oracle::x_oracle::XOracle;
 
-#[allow(unused_field)]
 public struct LiquidateEvent has copy, drop {
-    liquidator: address,
-    obligation: ID,
-    debt_type: TypeName,
-    collateral_type: TypeName,
-    repay_on_behalf: u64,
-    repay_revenue: u64,
-    liq_amount: u64,
-}
-
-public struct LiquidateEventV2 has copy, drop {
     liquidator: address,
     obligation: ID,
     debt_type: TypeName,
@@ -43,7 +32,7 @@ public struct LiquidateEventV2 has copy, drop {
     timestamp: u64,
 }
 
-public entry fun liquidate_entry<CollateralType>(
+public fun liquidate_entry<CollateralType>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,
@@ -122,7 +111,7 @@ public fun liquidate<CollateralType>(
         ctx,
     );
 
-    emit(LiquidateEventV2 {
+    emit(LiquidateEvent {
         liquidator: tx_context::sender(ctx),
         obligation: object::id(obligation),
         debt_type: type_name::get<COIN_GUSD>(),

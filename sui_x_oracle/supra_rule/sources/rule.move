@@ -17,7 +17,7 @@ module supra_rule::rule {
   const SUPRA_PRICE_TOO_OLD: u64 = 0x11304;
   const SUPRA_PRICE_TOO_NEW: u64 = 0x11305;
 
-  struct Rule has drop {}
+  public struct Rule has drop {}
 
 
   public fun set_price<CoinType>(

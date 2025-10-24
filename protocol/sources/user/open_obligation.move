@@ -28,7 +28,7 @@ public struct ObligationCreatedEvent has copy, drop {
 /// @param version The version control object, contract version must match with this
 /// @param ctx The SUI transaction context object
 #[allow(lint(share_owned))]
-public entry fun open_obligation_entry(version: &Version, ctx: &mut TxContext) {
+public fun open_obligation_entry(version: &Version, ctx: &mut TxContext) {
     // Check version
     version::assert_current_version(version);
     let (obligation, obligation_key) = obligation::new(ctx);

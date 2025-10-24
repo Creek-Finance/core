@@ -1,6 +1,6 @@
 [package]
 name = "xaum_indicator_core"
-edition = "2024.beta"
+edition = "2024"
 
 [dependencies]
 XOracle = { local = "../../sui_x_oracle/x_oracle" }

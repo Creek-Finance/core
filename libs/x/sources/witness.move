@@ -4,10 +4,10 @@ module x::witness {
   const EInvalidPublisher: u64 = 0x21101;
 
   /// Witness generator
-  struct WitnessGenerator<phantom T> has store {}
+  public struct WitnessGenerator<phantom T> has store {}
 
   /// Delegated witness of a generic type. The type `T` can be any type.
-  struct Witness<phantom T> has drop {}
+  public struct Witness<phantom T> has drop {}
 
   /// Creates a delegated witness from package publisher.
   public fun from_publisher<T>(publisher: &Publisher): Witness<T> {

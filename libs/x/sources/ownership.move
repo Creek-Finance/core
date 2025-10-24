@@ -1,11 +1,8 @@
 module x::ownership {
   
-  use sui::object::{Self, UID, ID};
-  use sui::tx_context::TxContext;
-  
   const ENotOwner: u64 = 0;
   
-  struct Ownership<phantom T: drop> has key, store {
+  public struct Ownership<phantom T: drop> has key, store {
     id: UID,
     of: ID,
   }

@@ -57,7 +57,7 @@ fun init(ctx: &mut TxContext) {
 }
 
 // Mint GUSD, only accepts USDC, calls the Market module
-public entry fun mint_gusd(
+public fun mint_gusd(
     vault: &mut USDCVault,
     market: &mut Market,
     usdc: Coin<USDC>,
@@ -84,7 +84,7 @@ public entry fun mint_gusd(
 }
 
 // Redeem GUSD, burn GUSD to receive USDC, deducting 0.3% fee
-public entry fun redeem_gusd(
+public fun redeem_gusd(
     vault: &mut USDCVault,
     market: &mut Market,
     gusd: Coin<COIN_GUSD>,
@@ -140,7 +140,7 @@ public fun get_fee_rate(vault: &USDCVault): u64 {
 }
 
 // Admin: update team address
-public entry fun update_team_address(
+public fun update_team_address(
     vault: &mut USDCVault,
     new_address: address,
     ctx: &mut TxContext,
@@ -150,13 +150,13 @@ public entry fun update_team_address(
 }
 
 // Admin: update fee rate
-public entry fun update_fee_rate(vault: &mut USDCVault, new_fee_rate: u64, ctx: &mut TxContext) {
+public fun update_fee_rate(vault: &mut USDCVault, new_fee_rate: u64, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
     vault.fee_rate = new_fee_rate;
 }
 
 // Admin: update admin address
-public entry fun update_admin(vault: &mut USDCVault, new_admin: address, ctx: &mut TxContext) {
+public fun update_admin(vault: &mut USDCVault, new_admin: address, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
 
     let old_admin = vault.admin;

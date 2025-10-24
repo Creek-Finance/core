@@ -1,6 +1,6 @@
 module protocol::market;
 
-use coin_gusd::coin_gusd::{COIN_GUSD, mint};
+use coin_gusd::coin_gusd::COIN_GUSD;
 use math::fixed_point32_empower;
 use protocol::asset_active_state::{Self, AssetActiveStates};
 use protocol::borrow_dynamics::{Self, BorrowDynamics, BorrowDynamic};
@@ -8,13 +8,12 @@ use protocol::collateral_stats::{Self, CollateralStats, CollateralStat};
 use protocol::error;
 use protocol::interest_model::{Self, InterestModels, InterestModel};
 use protocol::limiter::{Self, Limiters, Limiter};
-use protocol::reserve::{Self, Reserve, MarketCoin, FlashLoan};
+use protocol::reserve::{Self, Reserve, FlashLoan};
 use protocol::risk_model::{Self, RiskModels, RiskModel};
 use std::fixed_point32;
 use std::type_name::{Self, TypeName, get};
 use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin, TreasuryCap};
-use sui::dynamic_field as df;
 use sui::event;
 use x::ac_table::{Self, AcTable, AcTableCap};
 use x::wit_table::{Self, WitTable};
@@ -72,7 +71,7 @@ public fun collateral_stats(market: &Market): &WitTable<CollateralStats, TypeNam
 
 public fun total_global_debt(market: &Market, pool_type: TypeName): u64 {
     let balance_sheet = wit_table::borrow(reserve::balance_sheets(&market.vault), pool_type);
-    let (_, debt, _, _) = reserve::balance_sheet(balance_sheet);
+    let (debt, _, _) = reserve::balance_sheet(balance_sheet);
     debt
 }
 
@@ -400,4 +399,15 @@ public(package) fun repay_flash_loan(
         ctx,
     );
     burn_gusd(self, principal_coin, ctx);
+}
+
+public(package) fun handle_borrow(
+    self: &mut Market,
+    amount: u64,
+    now: u64,
+    ctx: &mut TxContext,
+): Coin<COIN_GUSD> {
+    let coin = mint_gusd(self, amount, now, ctx);
+    reserve::handle_borrow<COIN_GUSD>(&mut self.vault, amount);
+    coin
 }

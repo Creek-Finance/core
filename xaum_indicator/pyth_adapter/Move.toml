@@ -1,6 +1,6 @@
 [package]
 name = "xaum_indicator_pyth_adapter"
-edition = "2024.beta"
+edition = "2024"
 
 [dependencies]
 Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "sui-contract-testnet" }

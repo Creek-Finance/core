@@ -10,31 +10,14 @@ use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
 
-#[allow(unused_field)]
 public struct BorrowFlashLoanEvent has copy, drop {
     borrower: address,
     asset: TypeName,
     amount: u64,
-}
-
-#[allow(unused_field)]
-public struct RepayFlashLoanEvent has copy, drop {
-    borrower: address,
-    asset: TypeName,
-    amount: u64,
-}
-
-public struct BorrowFlashLoanV2Event has copy, drop {
-    borrower: address,
-    asset: TypeName,
-    amount: u64,
     fee: u64,
-    // reserved
-    fee_discount_numerator: u64,
-    fee_discount_denominator: u64,
 }
 
-public struct RepayFlashLoanV2Event has copy, drop {
+public struct RepayFlashLoanEvent has copy, drop {
     borrower: address,
     asset: TypeName,
     amount: u64,
@@ -77,22 +60,19 @@ fun borrow_flash_loan_internal(
     clock: &Clock,
     ctx: &mut TxContext,
 ): (Coin<COIN_GUSD>, FlashLoan<COIN_GUSD>) {
-
     let now = clock::timestamp_ms(clock) / 1000;
 
-    let coin_type = type_name::with_defining_ids<COIN_GUSD>();
+    let coin_type = type_name::get<COIN_GUSD>();
     // check if base asset is active
     assert!(market::is_base_asset_active(market, coin_type), error::base_asset_not_active_error());
 
     let (coin, receipt) = market::borrow_flash_loan(market, amount, now, ctx);
 
     // Emit the borrow flash loan event
-    emit(BorrowFlashLoanV2Event {
+    emit(BorrowFlashLoanEvent {
         borrower: tx_context::sender(ctx),
         asset: coin_type,
         fee: reserve::flash_loan_fee(&receipt),
-        fee_discount_denominator: 0,
-        fee_discount_numerator: 0,
         amount,
     });
 
@@ -119,9 +99,9 @@ public fun repay_flash_loan(
     version::assert_current_version(version);
 
     // Emit the repay flash loan event
-    emit(RepayFlashLoanV2Event {
+    emit(RepayFlashLoanEvent {
         borrower: tx_context::sender(ctx),
-        asset: type_name::with_defining_ids<COIN_GUSD>(),
+        asset: type_name::get<COIN_GUSD>(),
         amount: coin::value(&coin),
         fee: reserve::flash_loan_fee(&loan),
     });

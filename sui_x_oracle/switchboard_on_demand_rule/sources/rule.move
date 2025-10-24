@@ -18,7 +18,7 @@ module switchboard_on_demand_rule::rule {
   const SWITCHBOARD_DECIMALS: u8 = 18;
 
 
-  struct Rule has drop {}
+  public struct Rule has drop {}
 
   public fun set_price_as_primary<CoinType>(
     request: &mut XOraclePriceUpdateRequest<CoinType>,

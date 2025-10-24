@@ -6,7 +6,7 @@ module manual_rule::rule {
   use x_oracle::price_feed;
 
   /// Marker rule type for manual pricing. Can be used as primary or secondary.
-  struct Rule has drop {}
+  public struct Rule has drop {}
 
   /// Feed price directly as 9-decimal integer; timestamp is on-chain now (seconds)
   public fun set_price_as_primary<CoinType>(

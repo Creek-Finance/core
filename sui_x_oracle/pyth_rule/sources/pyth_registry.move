@@ -1,10 +1,7 @@
 module pyth_rule::pyth_registry {
 
   use std::type_name::{Self, TypeName};
-  use sui::object::{Self, UID, ID};
   use sui::table::{Self, Table};
-  use sui::tx_context::{Self, TxContext};
-  use sui::transfer;
 
   use pyth::price_info::PriceInfoObject;
 
@@ -14,17 +11,17 @@ module pyth_rule::pyth_registry {
 
   const CONF_TOLERANCE_DENOMINATOR: u64 = 10_000;
 
-  struct PythFeedData has store, drop {
+  public struct PythFeedData has store, drop {
     feed: ID,
     conf_tolerance: u64, // confidence
   }
-  struct PythRegistry has key {
+  public struct PythRegistry has key {
     id: UID,
     table: Table<TypeName, PythFeedData>,
   }
-  struct PythRegistryCap has key, store {
+  public struct PythRegistryCap has key, store {
     id: UID,
-    for: ID,
+    for_registry: ID,
   }
 
   public fun conf_tolerance_denominator(): u64 {
@@ -38,7 +35,7 @@ module pyth_rule::pyth_registry {
     };
     let pyth_registry_cap = PythRegistryCap {
       id: object::new(ctx),
-      for: object::id(&pyth_registry)
+      for_registry: object::id(&pyth_registry)
     };
     transfer::share_object(pyth_registry);
     transfer::transfer(pyth_registry_cap, tx_context::sender(ctx));
@@ -59,14 +56,14 @@ module pyth_rule::pyth_registry {
     pyth_feed_data.conf_tolerance
   }
 
-  public entry fun register_pyth_feed<CoinType>(
+  public fun register_pyth_feed<CoinType>(
     pyth_registry: &mut PythRegistry,
     pyth_registry_cap: &PythRegistryCap,
     pyth_info_object: &PriceInfoObject,
     pyth_feed_confidence_tolerance: u64, // per 10,000. so 1 = 0.01%
   ) {
     assert!(pyth_feed_confidence_tolerance <= conf_tolerance_denominator(), ERR_INVALID_CONF_TOLERANCE);
-    assert!(object::id(pyth_registry) == pyth_registry_cap.for, ERR_ILLEGAL_REGISTRY_CAP);
+    assert!(object::id(pyth_registry) == pyth_registry_cap.for_registry, ERR_ILLEGAL_REGISTRY_CAP);
     let coin_type = type_name::get<CoinType>();
     if (table::contains(&pyth_registry.table, coin_type)) {
       table::remove<TypeName, PythFeedData>(&mut pyth_registry.table, coin_type);

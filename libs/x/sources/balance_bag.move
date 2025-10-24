@@ -10,10 +10,8 @@ module x::balance_bag {
   use std::type_name::{Self, TypeName};
   use sui::bag::{Self, Bag};
   use sui::balance::{Self, Balance};
-  use sui::object::{Self, UID};
-  use sui::tx_context;
   
-  struct BalanceBag has store {
+  public struct BalanceBag has key, store {
     id: UID,
     bag: Bag,
   }

@@ -2,7 +2,7 @@
 module x_oracle::supra_mock_adapter {
     use x_oracle::price_feed;
     use x_oracle::x_oracle::XOraclePriceUpdateRequest;
-    struct SupraRule has drop {}
+    public struct SupraRule has drop {}
 
     #[test_only]
     public fun update_price_as_primary<CoinType>(

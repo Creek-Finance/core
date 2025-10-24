@@ -40,4 +40,19 @@ public fun burn_to_supply(supply: &mut Supply<COIN_GY>, coin: Coin<COIN_GY>): u6
     balance::decrease_supply(supply, balance)
 }
 
+#[test_only]
+public fun create_treasury_for_testing(ctx: &mut TxContext): TreasuryCap<COIN_GY> {
+    let (treasury_cap, metadata) = coin::create_currency(
+        COIN_GY {},
+        9,
+        b"GY",
+        b"GY Token (test)",
+        b"Test GY token for staking tests",
+        option::none(),
+        ctx,
+    );
+    sui::transfer::public_freeze_object(metadata);
+    treasury_cap
+}
+
 

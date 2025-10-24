@@ -1,23 +1,20 @@
 module switchboard_on_demand_rule::switchboard_registry {
 
   use std::type_name::{Self, TypeName};
-  use sui::object::{Self, UID, ID};
   use sui::table::{Self, Table};
-  use sui::tx_context::{Self, TxContext};
-  use sui::transfer;
 
   use switchboard::aggregator::Aggregator;
 
   const ERR_ILLEGAL_SWITCHBOARD_AGGREGATOR: u64 = 0x11405;
   const ERR_ILLEGAL_REGISTRY_CAP: u64 = 0x11406;
 
-  struct SwitchboardRegistry has key {
+  public struct SwitchboardRegistry has key {
     id: UID,
     table: Table<TypeName, ID>
   }
-  struct SwitchboardRegistryCap has key, store {
+  public struct SwitchboardRegistryCap has key, store {
     id: UID,
-    for: ID,
+    for_registry: ID,
   }
 
   fun init(ctx: &mut TxContext) {
@@ -27,18 +24,18 @@ module switchboard_on_demand_rule::switchboard_registry {
     };
     let switchboard_registry_cap = SwitchboardRegistryCap {
       id: object::new(ctx),
-      for: object::id(&switchboard_registry)
+      for_registry: object::id(&switchboard_registry)
     };
     transfer::share_object(switchboard_registry);
     transfer::transfer(switchboard_registry_cap, tx_context::sender(ctx));
   }
 
-  public entry fun register_switchboard_aggregator<CoinType>(
+  public fun register_switchboard_aggregator<CoinType>(
     switchboard_registry: &mut SwitchboardRegistry,
     switchboard_registry_cap: &SwitchboardRegistryCap,
     switchboard_aggregator: &Aggregator,
   ) {
-    assert!(object::id(switchboard_registry) == switchboard_registry_cap.for, ERR_ILLEGAL_REGISTRY_CAP);
+    assert!(object::id(switchboard_registry) == switchboard_registry_cap.for_registry, ERR_ILLEGAL_REGISTRY_CAP);
     let coin_type = type_name::get<CoinType>();
     if (table::contains(&switchboard_registry.table, coin_type)) {
       table::remove<TypeName, ID>(&mut switchboard_registry.table, coin_type);

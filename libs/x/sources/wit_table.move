@@ -2,19 +2,15 @@
 /// Witness is required to write or destory
 /// Read is open to anyone
 module x::wit_table {
-  use sui::object::{Self, UID};
   use sui::table::{Self, Table};
   use sui::vec_set::{Self, VecSet};
-  use sui::tx_context::TxContext;
-  use std::option;
-  use std::vector;
   
   /// A data structure backed by sui::table and sui::vec_set.
   /// All write operations are controlled by witness pattern
   /// If you set withKeys = true when creating table:
   /// It will store all the keys in a vector, with which you can use to loop the table.
   /// The keys are in insertion order.
-  struct WitTable<phantom T: drop, K: copy + drop + store, phantom V: store> has key, store {
+  public struct WitTable<phantom T: drop, K: copy + drop + store, phantom V: store> has key, store {
     id: UID,
     table: Table<K, V>,
     keys: option::Option<VecSet<K>>,

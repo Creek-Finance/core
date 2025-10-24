@@ -3,24 +3,21 @@ module coin_decimals_registry::coin_decimals_registry {
   use std::ascii::String;
   use std::type_name::{Self, TypeName};
   use sui::table::{Self, Table};
-  use sui::object::{Self, UID};
   use sui::coin::{Self, CoinMetadata};
   use sui::sui::SUI;
-  use sui::tx_context::TxContext;
-  use sui::transfer;
   use sui::package;
   use sui::event::emit;
 
   const EDecimalsNotFound: u64 = 999;
 
-  struct COIN_DECIMALS_REGISTRY has drop {}
+  public struct COIN_DECIMALS_REGISTRY has drop {}
 
-  struct CoinDecimalsRegistry has key, store {
+  public struct CoinDecimalsRegistry has key, store {
     id: UID,
     table: Table<TypeName, u8>
   }
 
-  struct CoinDecimalsRegistered has copy, drop {
+  public struct CoinDecimalsRegistered has copy, drop {
     registry: address,
     coin_type: String,
     decimals: u8,
@@ -28,7 +25,7 @@ module coin_decimals_registry::coin_decimals_registry {
   
   fun init(otw: COIN_DECIMALS_REGISTRY, ctx: &mut TxContext){
     package::claim_and_keep(otw, ctx);
-    let registry = CoinDecimalsRegistry {
+    let mut registry = CoinDecimalsRegistry {
       id: object::new(ctx),
       table: table::new(ctx)
     };
@@ -50,7 +47,7 @@ module coin_decimals_registry::coin_decimals_registry {
   // Since coinMeta is 1:1 for a coin,
   // CoinMeta is the single source of truth for the coin
   // Anyone can add the registry
-  public entry fun register_decimals<T>(
+  public fun register_decimals<T>(
     registry: &mut CoinDecimalsRegistry,
     coin_meta: &CoinMetadata<T>
   ) {

@@ -25,7 +25,7 @@ public struct CollateralDepositEvent has copy, drop {
 /// @param coin The collateral to be deposited
 /// @param ctx The SUI transaction context object
 /// @custom:T The type of the collateral
-public entry fun deposit_collateral<T>(
+public fun deposit_collateral<T>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,
@@ -49,11 +49,6 @@ public entry fun deposit_collateral<T>(
     let has_risk_model = market::has_risk_model(market, coin_type);
     assert!(has_risk_model == true, error::invalid_collateral_type_error());
 
-    // Avoid the loop of collateralize and borrow of same assets
-    assert!(
-        !obligation::has_coin_x_as_debt(obligation, coin_type),
-        error::unable_to_deposit_a_borrowed_coin(),
-    );
 
     // Emit collateral deposit event
     emit(CollateralDepositEvent {

@@ -5,14 +5,11 @@ And, the value could be consume only once.
 **********/
 module x::one_time_lock_value {
   
-  use sui::object::{Self, UID};
-  use sui::tx_context::{Self, TxContext};
-
   const EValueExpired: u64 = 1;
   const EValuePending: u64 = 2;
   const ECannotDestoryNonExpiredValue: u64 = 3;
   
-  struct OneTimeLockValue<T: store + copy + drop> has key, store {
+  public struct OneTimeLockValue<T: store + copy + drop> has key, store {
     id: UID,
     value: T,
     lock_until_epoch: u64,

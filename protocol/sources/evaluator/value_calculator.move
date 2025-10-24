@@ -1,9 +1,8 @@
 module protocol::value_calculator;
 
-use math::fixed_point32_empower;
 use math::u64;
-use std::debug;
 use std::fixed_point32::{Self, FixedPoint32};
+use math::fixed_point32_empower;
 use sui::math;
 
 public fun usd_value(price: FixedPoint32, amount: u64, decimals: u8): FixedPoint32 {
@@ -25,7 +24,7 @@ public fun test_usd_value() {
     let decimals = 5;
     let amount = 20_000_350_000 * math::pow(10, decimals);
     let val = usd_value(price, amount, decimals);
-    debug::print(&val);
+    std::debug::print(&val);
 }
 
 #[test]
@@ -35,8 +34,8 @@ public fun test_usd_value_result_should_equal() {
     let amount = 200_003_500 * math::pow(10, decimals);
     let val = usd_value(price, amount, decimals);
     let val_old = usd_value_deprecated(price, amount, decimals);
-    debug::print(&val);
-    debug::print(&val_old);
+    std::debug::print(&val);
+    std::debug::print(&val_old);
     assert!(val == val_old, 0);
 }
 

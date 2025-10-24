@@ -1,11 +1,9 @@
 module x::supply_bag {
   use std::type_name::{Self, TypeName};
-  use sui::tx_context::TxContext;
   use sui::bag::{Self ,Bag};
   use sui::balance::{Self, Balance, Supply};
-  use sui::object::{Self, UID};
   
-  struct SupplyBag has store {
+  public struct SupplyBag has key, store {
     id: UID,
     bag: Bag
   }
