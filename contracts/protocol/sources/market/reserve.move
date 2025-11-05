@@ -163,13 +163,21 @@ public(package) fun handle_liquidation<T>(
     // split the repay_balance into principal part and interest part
     let principal_balance = balance::split(&mut repay_balance, debt_to_burn);
 
-    // insert interest to reserve's underlying balances
     if (interest_to_keep > 0) {
         balance_bag::join(&mut self.underlying_balances, repay_balance);
         balance_bag::join(&mut self.underlying_balances, revenue_balance);
     } else {
-        balance::destroy_zero(repay_balance);
-        balance::destroy_zero(revenue_balance);
+        if (balance::value(&repay_balance) > 0) {
+            balance_bag::join(&mut self.underlying_balances, repay_balance);
+        } else {
+            balance::destroy_zero(repay_balance);
+        };
+
+        if (balance::value(&revenue_balance) > 0) {
+            balance_bag::join(&mut self.underlying_balances, revenue_balance);
+        } else {
+            balance::destroy_zero(revenue_balance);
+        };
     };
 
     principal_balance // return the principal part balance to be burned
