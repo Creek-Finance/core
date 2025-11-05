@@ -151,6 +151,8 @@ public fun unstake(
     let min_gr_gy_amount = MIN_STAKE_AMOUNT * EXCHANGE_RATE;
     assert!(gr_amount >= min_gr_gy_amount, error::staking_insufficient_gr_gy_error());
 
+    assert!(gr_amount % EXCHANGE_RATE == 0, error::staking_gr_amount_not_divisible_error());
+
     let xaum_return_amount = gr_amount / EXCHANGE_RATE;
     assert!(balance::value(&manager.xaum_pool) >= xaum_return_amount, error::staking_pool_xaum_not_enough_error());
 
