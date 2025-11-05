@@ -14,7 +14,7 @@ use protocol::staking_manager::{Self as staking_manager, StakingManager};
 use std::fixed_point32::{Self, FixedPoint32};
 use std::type_name::{Self, TypeName};
 use sui::clock::{Self, Clock};
-use sui::coin::TreasuryCap;
+use sui::coin::{Self, TreasuryCap};
 use sui::dynamic_field;
 use sui::event;
 use sui::package;
@@ -117,13 +117,9 @@ public fun resume_protocol(_admin_cap: &AdminCap, market: &mut Market) {
     market::set_paused(market, false);
 }
 
-/// Anyone can call. If GUSD price deviates from 1 by >= 0.8%, auto-pause protocol.
-/// Deviation threshold: 0.008
-public fun check_and_pause_if_gusd_depeg(
-    market: &mut Market,
-    x_oracle: &XOracle,
-    clock: &Clock,
-) {
+/// Anyone can call. If GUSD price deviates from 1 by >= 8%, auto-pause protocol.
+/// Deviation threshold: 0.08
+public fun check_and_pause_if_gusd_depeg(market: &mut Market, x_oracle: &XOracle, clock: &Clock) {
     if (market::is_paused(market)) { return }; // already paused
 
     let price = price_eval::get_price(x_oracle, type_name::get<COIN_GUSD>(), clock);
@@ -133,7 +129,7 @@ public fun check_and_pause_if_gusd_depeg(
     } else {
         fixed_point32_empower::sub(one, price)
     };
-    let tolerance = fixed_point32::create_from_rational(8, 1000); // 0.008
+    let tolerance = fixed_point32::create_from_rational(8, 100); // 0.08
 
     if (fixed_point32_empower::gte(diff, tolerance)) {
         market::set_paused(market, true);
@@ -369,16 +365,19 @@ public fun take_revenue<T>(
     amount: u64,
     ctx: &mut TxContext,
 ) {
+    assert!(admin_cap.reward_address != @0x0, error::invalid_reward_address_error());
+    let revenue_coin = market::take_revenue<T>(market, amount, ctx);
+    let revenue_amount = coin::value(&revenue_coin);
+
+    transfer::public_transfer(revenue_coin, admin_cap.reward_address);
+
     event::emit(TakeRevenueEvent {
         market: object::id(market),
-        amount,
+        amount: revenue_amount,
         coin_type: type_name::get<T>(),
         sender: tx_context::sender(ctx),
         recipient: admin_cap.reward_address,
     });
-
-    let coin = market::take_revenue<T>(market, amount, ctx);
-    transfer::public_transfer(coin, admin_cap.reward_address);
 }
 
 /// ======= take borrow fee =======
@@ -388,6 +387,11 @@ public fun take_borrow_fee<T>(
     amount: u64,
     ctx: &mut TxContext,
 ) {
+    assert!(admin_cap.reward_address != @0x0, error::invalid_reward_address_error());
+
+    let coin = market::take_borrow_fee<T>(market, amount, ctx);
+    transfer::public_transfer(coin, admin_cap.reward_address);
+
     event::emit(TakeBorrowFeeEvent {
         market: object::id(market),
         amount,
@@ -395,9 +399,6 @@ public fun take_borrow_fee<T>(
         sender: tx_context::sender(ctx),
         recipient: admin_cap.reward_address,
     });
-
-    let coin = market::take_borrow_fee<T>(market, amount, ctx);
-    transfer::public_transfer(coin, admin_cap.reward_address);
 }
 
 /// ======= staking fee (XAUM) =======
@@ -429,6 +430,10 @@ public fun take_staking_fee(
     amount: u64,
     ctx: &mut TxContext,
 ) {
+    assert!(admin_cap.reward_address != @0x0, error::invalid_reward_address_error());
+
+    let coin = staking_manager::take_stake_fee_coin(manager, amount, ctx);
+    transfer::public_transfer(coin, admin_cap.reward_address);
     event::emit(TakeStakingFeeEvent {
         manager: object::id(manager),
         amount,
@@ -436,9 +441,6 @@ public fun take_staking_fee(
         sender: tx_context::sender(ctx),
         recipient: admin_cap.reward_address,
     });
-
-    let coin = staking_manager::take_stake_fee_coin(manager, amount, ctx);
-    transfer::public_transfer(coin, admin_cap.reward_address);
 }
 
 /// ======= Management of obligation access keys
@@ -524,10 +526,6 @@ public fun transfer_admin_cap(admin_cap: AdminCap, new_admin: address) {
     transfer::transfer(admin_cap, new_admin);
 }
 
-public fun set_flash_loan_single_cap(
-    _admin_cap: &AdminCap,
-    market: &mut Market,
-    single_cap: u64,
-) {
+public fun set_flash_loan_single_cap(_admin_cap: &AdminCap, market: &mut Market, single_cap: u64) {
     market::set_flash_loan_single_cap(market, single_cap);
 }

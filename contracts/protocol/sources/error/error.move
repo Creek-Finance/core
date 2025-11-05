@@ -71,4 +71,7 @@ module protocol::error {
   // Fee exceeds or equals amount which makes net amount non-positive
   public fun staking_fee_exceeds_amount_error(): u64 { 0x0017007 }
   public fun staking_gr_amount_not_divisible_error(): u64 { 0x0017008 }
+
+  // app
+  public fun invalid_reward_address_error(): u64 { 0x0018001 }
 }
