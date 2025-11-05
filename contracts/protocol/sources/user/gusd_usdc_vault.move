@@ -14,6 +14,11 @@ use test_coin::usdc::USDC;
 const E_INSUFFICIENT_BALANCE: u64 = 1;
 const E_INVALID_AMOUNT: u64 = 2;
 const E_NOT_ADMIN: u64 = 3;
+const E_INVALID_FEE_RATE: u64 = 4;
+const E_OVERFLOW: u64 = 5;
+const E_INVALID_FEE: u64 = 6;
+
+const U64_MAX: u128 = 18446744073709551615u128;
 
 // Vault structure, stores USDC balance, team address and fee rate
 public struct USDCVault has key, store {
@@ -42,6 +47,18 @@ public struct RedeemEvent has copy, drop {
 public struct AdminUpdatedEvent has copy, drop {
     old_admin: address,
     new_admin: address,
+}
+
+// Event: Team address updated
+public struct TeamAddressUpdatedEvent has copy, drop {
+    old_team_address: address,
+    new_team_address: address,
+}
+
+// Event: Fee rate updated
+public struct FeeRateUpdatedEvent has copy, drop {
+    old_fee_rate: u64,
+    new_fee_rate: u64,
 }
 
 // Initialize vault, set team address and admin address
@@ -95,10 +112,16 @@ public fun redeem_gusd(
 
     // Check if vault has enough USDC
     let available_usdc = balance::value(&vault.usdc_balance);
+    assert!(available_usdc >= amount, E_INSUFFICIENT_BALANCE);
 
-    let fee = u64::mul_div(amount, vault.fee_rate, 10000);
+    let numerator = (amount as u128) * (vault.fee_rate as u128);
+    let fee128 = (numerator + 10000 - 1) / 10000;
+    assert!(fee128 <= U64_MAX, E_OVERFLOW);
+    let fee = (fee128 as u64);
+
+    assert!(fee < amount, E_INVALID_FEE);
+
     let redeem_amount = amount - fee;
-    assert!(available_usdc >= redeem_amount, E_INSUFFICIENT_BALANCE);
 
     // Burn GUSD in Market
     market::burn_gusd(market, gusd, ctx);
@@ -140,19 +163,28 @@ public fun get_fee_rate(vault: &USDCVault): u64 {
 }
 
 // Admin: update team address
-public fun update_team_address(
-    vault: &mut USDCVault,
-    new_address: address,
-    ctx: &mut TxContext,
-) {
+public fun update_team_address(vault: &mut USDCVault, new_address: address, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
+    let old_team_address = vault.team_address;
     vault.team_address = new_address;
+
+    event::emit(TeamAddressUpdatedEvent {
+        old_team_address,
+        new_team_address: new_address,
+    });
 }
 
 // Admin: update fee rate
 public fun update_fee_rate(vault: &mut USDCVault, new_fee_rate: u64, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
+    assert!(new_fee_rate > 0, E_INVALID_FEE_RATE);
+    let old_fee_rate = vault.fee_rate;
     vault.fee_rate = new_fee_rate;
+
+    event::emit(FeeRateUpdatedEvent {
+        old_fee_rate,
+        new_fee_rate,
+    });
 }
 
 // Admin: update admin address
