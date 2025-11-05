@@ -255,7 +255,10 @@ public(package) fun repay_flash_loan(
 }
 
 public(package) fun borrow_flash_loan(_self: &mut Reserve, amount: u64): FlashLoan<COIN_GUSD> {
-    let fee = u64::mul_div(amount, FLASH_LOAN_FEE_NUM, FLASH_LOAN_FEE_DEN);
+    let mut fee = u64::mul_div(amount, FLASH_LOAN_FEE_NUM, FLASH_LOAN_FEE_DEN);
+    if (amount > 0 && ((amount % FLASH_LOAN_FEE_DEN) != 0)) {
+        fee = fee + 1;
+    };
     FlashLoan<COIN_GUSD> { loan_amount: amount, fee }
 }
 
