@@ -207,15 +207,9 @@ public fun read_fee_pool_balance(manager: &StakingManager): u64 {
     balance::value(&manager.xaum_fee_pool)
 }
 
-/// Event emitted when staking fee is taken by admin
-public struct TakeStakeFeeEvent has copy, drop {
-    manager: ID,
-    amount: u64,
-    sender: address,
-}
-
-/// Update staking fee rate (numerator/denominator) by admin
-public fun update_stake_fee(
+/// Update staking fee rate (numerator/denominator) by admin.
+/// Restricted to package-level access. Intended to be called by protocol::app.
+public(package) fun update_stake_fee(
     manager: &mut StakingManager,
     numerator: u64,
     denominator: u64,
@@ -226,8 +220,9 @@ public fun update_stake_fee(
     manager.stake_fee_rate = fixed_point32::create_from_rational(numerator, denominator);
 }
 
-/// Update unstaking fee rate (numerator/denominator) by admin
-public fun update_unstake_fee(
+/// Update unstaking fee rate (numerator/denominator) by admin.
+/// Restricted to package-level access. Intended to be called by protocol::app.
+public(package) fun update_unstake_fee(
     manager: &mut StakingManager,
     numerator: u64,
     denominator: u64,
@@ -238,28 +233,10 @@ public fun update_unstake_fee(
     manager.unstake_fee_rate = fixed_point32::create_from_rational(numerator, denominator);
 }
 
-/// Take staking XAUM fee from the fee pool by admin
-public fun take_stake_fee(
-    manager: &mut StakingManager,
-    amount: u64,
-    ctx: &mut TxContext,
-) {
-    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
-    let fee_part = balance::split(&mut manager.xaum_fee_pool, amount);
-    let fee_coin = coin::from_balance(fee_part, ctx);
-
-    event::emit(TakeStakeFeeEvent {
-        manager: object::id(manager),
-        amount,
-        sender: tx_context::sender(ctx),
-    });
-
-    transfer::public_transfer(fee_coin, tx_context::sender(ctx));
-}
-
 /// Internal helper: split fee pool and return Coin without admin gate or event.
 /// Intended to be called by protocol::app which performs admin gating and event emission.
-public fun take_stake_fee_coin(
+/// Restricted to package-level access for security.
+public(package) fun take_stake_fee_coin(
     manager: &mut StakingManager,
     amount: u64,
     ctx: &mut TxContext,
