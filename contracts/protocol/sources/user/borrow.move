@@ -141,7 +141,7 @@ fun borrow_internal(
     let base_borrow_fee_amount = fixed_point32::multiply_u64(borrow_amount, *base_borrow_fee_rate);
 
     assert!(
-        borrow_amount > min_borrow_amount + base_borrow_fee_amount,
+        borrow_amount >= min_borrow_amount + base_borrow_fee_amount,
         error::borrow_too_small_error(),
     );
 
