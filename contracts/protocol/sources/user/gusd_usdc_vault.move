@@ -178,6 +178,7 @@ public fun update_team_address(vault: &mut USDCVault, new_address: address, ctx:
 public fun update_fee_rate(vault: &mut USDCVault, new_fee_rate: u64, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
     assert!(new_fee_rate > 0, E_INVALID_FEE_RATE);
+    assert!(new_fee_rate < 10000, E_INVALID_FEE_RATE);
     let old_fee_rate = vault.fee_rate;
     vault.fee_rate = new_fee_rate;
 
