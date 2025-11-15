@@ -61,6 +61,9 @@ public fun repay(
 
     // If the given coin is more than the debt, repay the debt only
     let (debt_amount, _) = obligation::debt(obligation, coin_type);
+
+    assert!(debt_amount > 0, error::no_debt_error());
+    
     let repay_amount = math::min(debt_amount, coin::value(&user_coin));
     let repay_coin = coin::split<COIN_GUSD>(&mut user_coin, repay_amount, ctx);
 
