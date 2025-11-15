@@ -1,8 +1,8 @@
 #[test_only]
 module xaum_indicator_core::xaum_indicator_core_test {
+    use sui::clock as clock;
     use sui::test_scenario;
     use sui::test_utils as sui_test_utils;
-    use sui::clock as clock;
 
     use x_oracle::x_oracle::{Self as x_oracle, XOracle, XOraclePolicyCap, GrIndicatorCap};
     use xaum_indicator_core::xaum_indicator_core as core;
@@ -33,11 +33,11 @@ module xaum_indicator_core::xaum_indicator_core_test {
     // Helper: create core storage and bind dedicated GrIndicatorCap
     fun create_storage_and_bind_cap(
         scenario: &mut test_scenario::Scenario,
-    ): core::PriceStorage {
-        let mut storage = core::create_price_storage(test_scenario::ctx(scenario));
+    ): (core::PriceStorage, core::AdminCap) {
+        let (mut storage, admin_cap) = core::test_create_storage_with_admin(test_scenario::ctx(scenario));
         let gr_cap = test_scenario::take_from_address<GrIndicatorCap>(scenario, ADMIN);
         core::bind_gr_cap(&mut storage, gr_cap, test_scenario::ctx(scenario));
-        storage
+        (storage, admin_cap)
     }
 
     // Test: set price (9-dec), advance EMA, and push GR indicators to XOracle; assert timestamp updated
@@ -50,22 +50,23 @@ module xaum_indicator_core::xaum_indicator_core_test {
         let (mut clk, mut xo, xocap) = init_oracle_and_clock(scenario);
 
         // create core storage
-        let mut storage = create_storage_and_bind_cap(scenario);
+        let (mut storage, admin_cap) = create_storage_and_bind_cap(scenario);
 
         // set price (9-dec input → scaled to 1e18), advance EMA, then push indicators to XOracle
         clock::set_for_testing(&mut clk, 1000 * 1000);
-        core::set_price_9dec(&mut storage, /*9-dec*/ 123_456_789, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, /*9-dec*/ 123_456_789, &mut xo, &clk, test_scenario::ctx(scenario));
 
         // after push, XOracle's cached last_updated should equal now; indicators cached
         assert!(x_oracle::gr_indicator_last_updated(&xo) == 1000, 0);
 
         // push another price; timestamp must be monotonically increasing
         clock::set_for_testing(&mut clk, 2000 * 1000);
-        core::set_price_9dec(&mut storage, 223_456_789, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, 223_456_789, &mut xo, &clk, test_scenario::ctx(scenario));
         assert!(x_oracle::gr_indicator_last_updated(&xo) == 2000, 0);
 
         // cleanup resources
         transfer::public_share_object(storage);
+        core::test_destroy_admin_cap(admin_cap);
         sui_test_utils::destroy(clk);
         sui_test_utils::destroy(xo);
         sui_test_utils::destroy(xocap);
@@ -83,16 +84,17 @@ module xaum_indicator_core::xaum_indicator_core_test {
 
         let (mut clk, mut xo, xocap) = init_oracle_and_clock(scenario);
 
-        let storage = core::create_price_storage(test_scenario::ctx(scenario));
+        let (storage, admin_cap) = core::test_create_storage_with_admin(test_scenario::ctx(scenario));
         // no cap bound here
         clock::set_for_testing(&mut clk, 1000 * 1000);
-        core::push_gr_indicators_to_x_oracle(&storage, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::push_gr_indicators_to_x_oracle(&storage, &admin_cap, &mut xo, &clk, test_scenario::ctx(scenario));
 
         // cleanup (unreachable on success)
         transfer::public_share_object(storage);
         sui_test_utils::destroy(clk);
         sui_test_utils::destroy(xo);
         sui_test_utils::destroy(xocap);
+        core::test_destroy_admin_cap(admin_cap);
         test_scenario::end(scenario_value);
     }
 
@@ -104,15 +106,16 @@ module xaum_indicator_core::xaum_indicator_core_test {
 
         let (mut clk, mut xo, xocap) = init_oracle_and_clock(scenario);
 
-        let mut storage = create_storage_and_bind_cap(scenario);
+        let (mut storage, admin_cap) = create_storage_and_bind_cap(scenario);
 
         clock::set_for_testing(&mut clk, 1000 * 1000);
-        core::set_price_9dec(&mut storage, 0, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, 0, &mut xo, &clk, test_scenario::ctx(scenario));
 
         transfer::public_share_object(storage);
         sui_test_utils::destroy(clk);
         sui_test_utils::destroy(xo);
         sui_test_utils::destroy(xocap);
+        core::test_destroy_admin_cap(admin_cap);
         test_scenario::end(scenario_value);
     }
 
@@ -124,20 +127,21 @@ module xaum_indicator_core::xaum_indicator_core_test {
 
         let (mut clk, mut xo, xocap) = init_oracle_and_clock(scenario);
 
-        let mut storage = create_storage_and_bind_cap(scenario);
+        let (mut storage, admin_cap) = create_storage_and_bind_cap(scenario);
 
         // first push at t=2000
         clock::set_for_testing(&mut clk, 2000 * 1000);
-        core::set_price_9dec(&mut storage, 100_000_000, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, 100_000_000, &mut xo, &clk, test_scenario::ctx(scenario));
 
         // then push at earlier time t=1500, should fail monotonicity in XOracle
         clock::set_for_testing(&mut clk, 1500 * 1000);
-        core::set_price_9dec(&mut storage, 101_000_000, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, 101_000_000, &mut xo, &clk, test_scenario::ctx(scenario));
 
         transfer::public_share_object(storage);
         sui_test_utils::destroy(clk);
         sui_test_utils::destroy(xo);
         sui_test_utils::destroy(xocap);
+        core::test_destroy_admin_cap(admin_cap);
         test_scenario::end(scenario_value);
     }
 
@@ -149,7 +153,7 @@ module xaum_indicator_core::xaum_indicator_core_test {
 
         let (mut clk, mut xo, xocap) = init_oracle_and_clock(scenario);
 
-        let mut storage = create_storage_and_bind_cap(scenario);
+        let (mut storage, admin_cap) = create_storage_and_bind_cap(scenario);
 
         // predefined 10 prices (9-decimals), first initializes EMA
         let p0: u64 = 120_000_000;
@@ -165,52 +169,52 @@ module xaum_indicator_core::xaum_indicator_core_test {
 
         // step 0
         clock::set_for_testing(&mut clk, 1000 * 1000);
-        core::set_price_9dec(&mut storage, p0, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p0, &mut xo, &clk, test_scenario::ctx(scenario));
         let e0 = get_e(&storage);
         assert!(e0 == p0, 0);
 
         clock::set_for_testing(&mut clk, 1001 * 1000);
-        core::set_price_9dec(&mut storage, p1, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p1, &mut xo, &clk, test_scenario::ctx(scenario));
         let e1 = get_e(&storage);
         check(e0, p1, e1);
 
         clock::set_for_testing(&mut clk, 1002 * 1000);
-        core::set_price_9dec(&mut storage, p2, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p2, &mut xo, &clk, test_scenario::ctx(scenario));
         let e2 = get_e(&storage);
         check(e1, p2, e2);
 
         clock::set_for_testing(&mut clk, 1003 * 1000);
-        core::set_price_9dec(&mut storage, p3, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p3, &mut xo, &clk, test_scenario::ctx(scenario));
         let e3 = get_e(&storage);
         check(e2, p3, e3);
 
         clock::set_for_testing(&mut clk, 1004 * 1000);
-        core::set_price_9dec(&mut storage, p4, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p4, &mut xo, &clk, test_scenario::ctx(scenario));
         let e4 = get_e(&storage);
         check(e3, p4, e4);
 
         clock::set_for_testing(&mut clk, 1005 * 1000);
-        core::set_price_9dec(&mut storage, p5, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p5, &mut xo, &clk, test_scenario::ctx(scenario));
         let e5 = get_e(&storage);
         check(e4, p5, e5);
 
         clock::set_for_testing(&mut clk, 1006 * 1000);
-        core::set_price_9dec(&mut storage, p6, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p6, &mut xo, &clk, test_scenario::ctx(scenario));
         let e6 = get_e(&storage);
         check(e5, p6, e6);
 
         clock::set_for_testing(&mut clk, 1007 * 1000);
-        core::set_price_9dec(&mut storage, p7, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p7, &mut xo, &clk, test_scenario::ctx(scenario));
         let e7 = get_e(&storage);
         check(e6, p7, e7);
 
         clock::set_for_testing(&mut clk, 1008 * 1000);
-        core::set_price_9dec(&mut storage, p8, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p8, &mut xo, &clk, test_scenario::ctx(scenario));
         let e8 = get_e(&storage);
         check(e7, p8, e8);
 
         clock::set_for_testing(&mut clk, 1009 * 1000);
-        core::set_price_9dec(&mut storage, p9, &mut xo, &clk, test_scenario::ctx(scenario));
+        core::set_price_9dec(&admin_cap, &mut storage, p9, &mut xo, &clk, test_scenario::ctx(scenario));
         let e9 = get_e(&storage);
         check(e8, p9, e9);
 
@@ -218,9 +222,8 @@ module xaum_indicator_core::xaum_indicator_core_test {
         sui_test_utils::destroy(clk);
         sui_test_utils::destroy(xo);
         sui_test_utils::destroy(xocap);
+        core::test_destroy_admin_cap(admin_cap);
         test_scenario::end(scenario_value);
     }
+
 }
-
-
-

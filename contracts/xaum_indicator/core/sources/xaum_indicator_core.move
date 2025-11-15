@@ -1,14 +1,20 @@
 module xaum_indicator_core::xaum_indicator_core {
-    use std::type_name::{TypeName, with_defining_ids};
-    use sui::clock::{Self as clock, Clock};
-    use sui::dynamic_object_field;
-    use sui::sui::SUI;
 
-    use x_oracle::x_oracle::{Self as x_oracle_mod, XOracle, GrIndicatorCap};
+    use std::type_name::{TypeName, with_defining_ids};
+    use sui::{
+        clock::Clock,
+        dynamic_object_field,
+        sui::SUI,
+    };
+
+    use x_oracle::x_oracle::{Self as x_oracle_mod, XOracle, XOracleAdminCap};
+
+    const E_NOT_ADMIN: u64 = 0x1;
 
     // Core storage and indicators; independent from Pyth adapter
     public struct PriceStorage has key, store {
         id: UID,
+        admin_cap_id: ID,
         asset_type: TypeName,
         // Optional bound Pyth price feed object id; set by adapter on non-local networks
         pyth_feed_id: Option<ID>,
@@ -25,11 +31,20 @@ module xaum_indicator_core::xaum_indicator_core {
         ema_initialized: bool,
     }
 
-    public struct GrCapKey has copy, drop, store {}
+    public struct AdminCap has key, store {
+        id: UID,
+    }
 
-    public fun create_price_storage(ctx: &mut TxContext): PriceStorage {
+    public struct OwnerCap has key, store {
+        id: UID,
+    }
+
+    public struct AdminCapKey has copy, drop, store {}
+
+    public fun create_price_storage(admin_cap_id: ID, ctx: &mut TxContext): PriceStorage {
         PriceStorage {
             id: object::new(ctx),
+            admin_cap_id,
             asset_type: with_defining_ids<SUI>(),
             pyth_feed_id: option::none<ID>(),
             latest_price: 0u256,
@@ -47,19 +62,68 @@ module xaum_indicator_core::xaum_indicator_core {
     }
 
     fun init(ctx: &mut TxContext) {
-        let storage = create_price_storage(ctx);
+        let admin = create_admin_cap(ctx);
+        let admin_cap_id = object::id(&admin);
+        let storage = create_price_storage(admin_cap_id, ctx);
         transfer::share_object(storage);
+        let owner = create_owner_cap(ctx);
+        transfer::transfer(owner, tx_context::sender(ctx));
+        transfer::transfer(admin, tx_context::sender(ctx));
+    }
+
+    fun create_admin_cap(ctx: &mut TxContext): AdminCap {
+        AdminCap { id: object::new(ctx) }
+    }
+
+    fun create_owner_cap(ctx: &mut TxContext): OwnerCap {
+        OwnerCap { id: object::new(ctx) }
+    }
+
+    #[allow(lint(custom_state_change))]
+    public fun transfer_owner_cap(owner_cap: OwnerCap, recipient: address) {
+        transfer::transfer(owner_cap, recipient);
+    }
+
+    /// Owner override: mint a fresh AdminCap and assign to `new_admin`
+    public fun set_admin_cap(
+        _owner_cap: &OwnerCap,
+        storage: &mut PriceStorage,
+        new_admin: address,
+        ctx: &mut TxContext,
+    ) {
+        let admin = create_admin_cap(ctx);
+        storage.admin_cap_id = object::id(&admin);
+        transfer::transfer(admin, new_admin);
+    }
+
+    #[test_only]
+    public fun test_create_storage_with_admin(ctx: &mut TxContext): (PriceStorage, AdminCap) {
+        let admin = create_admin_cap(ctx);
+        let storage = create_price_storage(object::id(&admin), ctx);
+        (storage, admin)
+    }
+
+    #[test_only]
+    public fun test_destroy_admin_cap(admin_cap: AdminCap) {
+        let AdminCap { id } = admin_cap;
+        object::delete(id);
+    }
+
+    public fun assert_admin(storage: &PriceStorage, admin_cap: &AdminCap) {
+        assert!(object::id(admin_cap) == storage.admin_cap_id, E_NOT_ADMIN);
     }
 
     /// Initialize EMA values with custom starting values (18-decimal precision)
     /// Can only be called once when ema_initialized is false
     public fun init_ema_values(
+        admin_cap: &AdminCap,
         storage: &mut PriceStorage,
         ema120_initial: u256,
         ema90_initial: u256,
         ema5_initial: u256,
         _ctx: &mut TxContext,
     ) {
+        assert_admin(storage, admin_cap);
         assert!(!storage.ema_initialized, 0);
         storage.ema120_current = ema120_initial;
         storage.ema120_previous = ema120_initial;
@@ -72,21 +136,30 @@ module xaum_indicator_core::xaum_indicator_core {
 
     // Manual price setter (9-decimals) for local/general usage
     public fun set_price_9dec(
+        admin_cap: &AdminCap,
         storage: &mut PriceStorage,
         value_9: u64,
         x_oracle: &mut XOracle,
         clock: &Clock,
         _ctx: &mut TxContext,
     ) {
+        assert_admin(storage, admin_cap);
         assert!(value_9 > 0, 0);
         let value_18 = (value_9 as u256) * 1000000000u256;
         update_price_storage(storage, value_18);
         // Push EMA120/EMA90 to XOracle (u64 scaled to 9 decimals)
-        push_gr_indicators_to_x_oracle(storage, x_oracle, clock, _ctx);
+        push_gr_indicators_to_x_oracle(storage, admin_cap, x_oracle, clock, _ctx);
     }
 
-    public fun bind_gr_cap(storage: &mut PriceStorage, cap: GrIndicatorCap, _ctx: &mut TxContext) {
-        dynamic_object_field::add<GrCapKey, GrIndicatorCap>(&mut storage.id, GrCapKey {}, cap);
+    /// Bind XOracleAdminCap to PriceStorage so it can push EMA120/EMA90 to XOracle
+    public fun bind_admin_cap(
+        storage: &mut PriceStorage,
+        admin_cap_auth: &AdminCap,
+        admin_cap: XOracleAdminCap,
+        _ctx: &mut TxContext,
+    ) {
+        assert_admin(storage, admin_cap_auth);
+        dynamic_object_field::add<AdminCapKey, XOracleAdminCap>(&mut storage.id, AdminCapKey {}, admin_cap);
     }
 
     // === EMA and average calculation ===
@@ -142,7 +215,8 @@ module xaum_indicator_core::xaum_indicator_core {
     }
 
     // Feed binding helpers (used by adapter)
-    public fun bind_pyth_feed_id(storage: &mut PriceStorage, feed_id: ID) {
+    public fun bind_pyth_feed_id(storage: &mut PriceStorage, admin_cap: &AdminCap, feed_id: ID) {
+        assert_admin(storage, admin_cap);
         assert!(option::is_none(&storage.pyth_feed_id), 0);
         storage.pyth_feed_id = option::some(feed_id);
     }
@@ -152,16 +226,23 @@ module xaum_indicator_core::xaum_indicator_core {
         *option::borrow(&storage.pyth_feed_id) == *feed_id
     }
 
-    // Push EMA120/EMA90 to XOracle using the internally bound GrIndicatorCap
-    public fun push_gr_indicators_to_x_oracle(storage: &PriceStorage, x_oracle: &mut XOracle, clock: &Clock, _ctx: &mut TxContext) {
+    // Push EMA120/EMA90 to XOracle using the internally bound AdminCap
+    public fun push_gr_indicators_to_x_oracle(
+        storage: &PriceStorage,
+        admin_cap: &AdminCap,
+        x_oracle: &mut XOracle,
+        clock: &Clock,
+        _ctx: &mut TxContext,
+    ) {
+        assert_admin(storage, admin_cap);
         let ema120_u256 = storage.ema120_current;
         let ema90_u256 = storage.ema90_current;
         let ema120_u64 = (ema120_u256 / 1000000000u256) as u64;
         let ema90_u64 = (ema90_u256 / 1000000000u256) as u64;
         let spot_u64 = (storage.latest_price / 1000000000u256) as u64;
-        let now = clock::timestamp_ms(clock) / 1000;
-        let cap_ref = dynamic_object_field::borrow<GrCapKey, GrIndicatorCap>(&storage.id, GrCapKey {});
-        x_oracle_mod::set_gr_indicators(x_oracle, cap_ref, ema120_u64, ema90_u64, spot_u64, now, _ctx);
+        let now = sui::clock::timestamp_ms(clock) / 1000;
+        let admin_cap_ref = dynamic_object_field::borrow<AdminCapKey, XOracleAdminCap>(&storage.id, AdminCapKey {});
+        x_oracle_mod::set_gr_indicators(x_oracle, admin_cap_ref, ema120_u64, ema90_u64, spot_u64, now, _ctx);
     }
 
     public fun get_latest_price(storage: &PriceStorage): u256 { storage.latest_price }
@@ -180,5 +261,3 @@ module xaum_indicator_core::xaum_indicator_core {
     // Helper for adapters to validate storage asset type
     public fun get_asset_type(storage: &PriceStorage): TypeName { storage.asset_type }
 }
-
-

@@ -11,7 +11,7 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
     use pyth::pyth;
 
     use x_oracle::x_oracle::XOracle;
-    use xaum_indicator_core::xaum_indicator_core::{Self as core, PriceStorage};
+    use xaum_indicator_core::xaum_indicator_core::{Self as core, AdminCap, PriceStorage};
 
     const ERR_NOT_SUI_STORAGE: u64 = 0xEA01;
     const ERR_FEED_ALREADY_INITIALIZED: u64 = 0xEA02;
@@ -20,26 +20,30 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
 
     /// Bind the Pyth price feed to core::PriceStorage using a dynamic field
     public fun init_feed(
+        admin_cap: &AdminCap,
         storage: &mut PriceStorage,
         price_info_object: &PriceInfoObject,
         _ctx: &mut tx_context::TxContext,
     ) {
+        core::assert_admin(storage, admin_cap);
         // Bind feed id via core helper to avoid accessing private fields
         assert!(!core::is_pyth_feed_bound(storage), ERR_FEED_ALREADY_INITIALIZED);
         let feed_id = object::id(price_info_object);
-        core::bind_pyth_feed_id(storage, feed_id);
+        core::bind_pyth_feed_id(storage, admin_cap, feed_id);
     }
 
     // no extra types
 
     /// Pull XAUM price from Pyth, convert to 18-decimal u256, update core, then push EMA120 to XOracle
     public fun update_xaum_price(
+        admin_cap: &AdminCap,
         storage: &mut PriceStorage,
         price_info_object: &PriceInfoObject,
         x_oracle: &mut XOracle,
         clock: &Clock,
         _ctx: &mut tx_context::TxContext,
     ) {
+        core::assert_admin(storage, admin_cap);
         assert!(with_defining_ids<SUI>() == core::get_asset_type(storage), ERR_NOT_SUI_STORAGE);
         // Verify feed binding
         assert!(core::is_pyth_feed_bound(storage), ERR_FEED_NOT_INITIALIZED);
@@ -56,7 +60,7 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
         let normalized = convert_price_to_u256(&p, &expo);
         core::update_price_storage_external(storage, normalized);
 
-        core::push_gr_indicators_to_x_oracle(storage, x_oracle, clock, _ctx);
+        core::push_gr_indicators_to_x_oracle(storage, admin_cap, x_oracle, clock, _ctx);
     }
 
     /// Normalize Pyth price to 18 decimals (same logic as original)
@@ -80,5 +84,3 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
 
     // No extra types needed
 }
-
-
