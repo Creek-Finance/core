@@ -159,28 +159,20 @@ public(package) fun handle_liquidation<T>(
     if (interest_to_keep > 0) {
         balance_sheet.revenue = balance_sheet.revenue + interest_to_keep;
     };
+    // combine repay_balance and revenue_balance
+    balance::join(&mut repay_balance, revenue_balance);
 
     // split the repay_balance into principal part and interest part
     let principal_balance = balance::split(&mut repay_balance, debt_to_burn);
 
-    if (interest_to_keep > 0) {
+    // The remaining balance (interest_to_keep) goes to underlying_balances
+    if (balance::value(&repay_balance) > 0) {
         balance_bag::join(&mut self.underlying_balances, repay_balance);
-        balance_bag::join(&mut self.underlying_balances, revenue_balance);
     } else {
-        if (balance::value(&repay_balance) > 0) {
-            balance_bag::join(&mut self.underlying_balances, repay_balance);
-        } else {
-            balance::destroy_zero(repay_balance);
-        };
-
-        if (balance::value(&revenue_balance) > 0) {
-            balance_bag::join(&mut self.underlying_balances, revenue_balance);
-        } else {
-            balance::destroy_zero(revenue_balance);
-        };
+        balance::destroy_zero(repay_balance);
     };
 
-    principal_balance // return the principal part balance to be burned
+    principal_balance // return principal part to be burned
 }
 
 public(package) fun take_revenue<T>(self: &mut Reserve, amount: u64, ctx: &mut TxContext): Coin<T> {
