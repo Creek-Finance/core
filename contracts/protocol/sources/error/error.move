@@ -55,7 +55,7 @@ module protocol::error {
   public fun borrow_limit_reached_error(): u64 { 0x0014002 }
 
   // repay
-  public fun zero_repay_amount_error(): u64 { 0x0015001 }
+  public fun zero_amount_error(): u64 { 0x0015001 }
 
   // market
   public fun market_paused_error(): u64 { 0x0016001 }

@@ -90,6 +90,8 @@ public fun withdraw_collateral<T>(
     // check version
     version::assert_current_version(version);
 
+    assert!(withdraw_amount > 0, error::zero_amount_error());
+
     // check if obligation is locked, if locked, unlock is required before calling this
     // This is a mechanism to enforce some actions before withdraw collateral
     assert!(

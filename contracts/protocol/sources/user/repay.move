@@ -45,7 +45,7 @@ public fun repay(
     // Check contract version
     version::assert_current_version(version);
 
-    assert!(coin::value(&user_coin) > 0, error::zero_repay_amount_error());
+    assert!(coin::value(&user_coin) > 0, error::zero_amount_error());
 
     // check if obligation is locked, if locked, unlock is needed before calling this
     // This is a mechanism to enforce some actions to be done before repay

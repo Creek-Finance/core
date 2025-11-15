@@ -29,13 +29,15 @@ public fun deposit_collateral<T>(
     version: &Version,
     obligation: &mut Obligation,
     market: &mut Market,
-    coin: Coin<T>,
+    deposit_coin: Coin<T>,
     ctx: &mut TxContext,
 ) {
     // check version
     version::assert_current_version(version);
     // global pause check
     assert!(!market::is_paused(market), error::market_paused_error());
+
+    assert!(coin::value(&deposit_coin) > 0, error::zero_amount_error());
 
     // check if obligation is locked, if locked, unlock operation is required before calling this function
     // This is a mechanism to enforce some operations before calling the function
@@ -49,18 +51,17 @@ public fun deposit_collateral<T>(
     let has_risk_model = market::has_risk_model(market, coin_type);
     assert!(has_risk_model == true, error::invalid_collateral_type_error());
 
-
     // Emit collateral deposit event
     emit(CollateralDepositEvent {
         provider: tx_context::sender(ctx),
         obligation: object::id(obligation),
         deposit_asset: coin_type,
-        deposit_amount: coin::value(&coin),
+        deposit_amount: coin::value(&deposit_coin),
     });
 
     // Update the total collateral amount in the market
-    market::handle_add_collateral<T>(market, coin::value(&coin));
+    market::handle_add_collateral<T>(market, coin::value(&deposit_coin));
 
     // Put the collateral into the obligation
-    obligation::deposit_collateral(obligation, coin::into_balance(coin))
+    obligation::deposit_collateral(obligation, coin::into_balance(deposit_coin))
 }

@@ -43,6 +43,7 @@ public fun borrow_flash_loan(
     assert!(!market::is_paused(market), error::market_paused_error());
     // check if version is supported
     version::assert_current_version(version);
+    assert!(amount > 0, error::zero_amount_error());
 
     let (coin, receipt) = borrow_flash_loan_internal(
         market,
@@ -91,21 +92,22 @@ fun borrow_flash_loan_internal(
 public fun repay_flash_loan(
     version: &Version,
     market: &mut Market,
-    coin: Coin<COIN_GUSD>,
+    repay_flash_coin: Coin<COIN_GUSD>,
     loan: FlashLoan<COIN_GUSD>,
     ctx: &mut TxContext,
 ) {
     // check if version is supported
     version::assert_current_version(version);
+    assert!(coin::value(&repay_flash_coin) > 0, error::zero_amount_error());
 
     // Emit the repay flash loan event
     emit(RepayFlashLoanEvent {
         borrower: tx_context::sender(ctx),
         asset: type_name::get<COIN_GUSD>(),
-        amount: coin::value(&coin),
+        amount: coin::value(&repay_flash_coin),
         fee: reserve::flash_loan_fee(&loan),
     });
 
     // Put the asset back to the market and consume the flash loan hot potato object
-    market::repay_flash_loan(market, coin, loan, ctx);
+    market::repay_flash_loan(market, repay_flash_coin, loan, ctx);
 }

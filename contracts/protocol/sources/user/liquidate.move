@@ -72,7 +72,8 @@ public fun liquidate<CollateralType>(
     version::assert_current_version(version);
 
     assert!(obligation::liquidate_locked(obligation) == false, error::obligation_locked());
-
+    assert!(coin::value(&available_repay_coin) > 0, error::zero_amount_error());
+    
     let mut available_repay_balance = coin::into_balance(available_repay_coin);
     let now = clock::timestamp_ms(clock) / 1000;
 
