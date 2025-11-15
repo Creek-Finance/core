@@ -7,7 +7,7 @@ module protocol::lock_obligation;
 use coin_decimals_registry::coin_decimals_registry::CoinDecimalsRegistry;
 use math::fixed_point32_empower;
 use protocol::collateral_value::collaterals_value_usd_for_liquidation;
-use protocol::debt_value::debts_value_usd_with_weight;
+use protocol::debt_value::debts_value_usd;
 use protocol::error;
 use protocol::market::{Self, Market};
 use protocol::obligation::{Self, Obligation};
@@ -59,10 +59,9 @@ public fun force_unlock_unhealthy<T: drop>(
     // calculate the value of debts in the context of liquidation
     // debt value is boosted by the borrow weight
     // 1000$ of market value debt, with 1.5x borrow weight, will be counted as 1500$
-    let weighted_debts_value = debts_value_usd_with_weight(
+    let weighted_debts_value = debts_value_usd(
         obligation,
         coin_decimals_registry,
-        market,
         x_oracle,
         clock,
     );

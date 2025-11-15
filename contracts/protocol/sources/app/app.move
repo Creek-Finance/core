@@ -161,13 +161,7 @@ public fun create_interest_model_change<T>(
     admin_cap: &AdminCap,
     base_rate_per_sec: u64,
     interest_rate_scale: u64,
-    borrow_rate_on_mid_kink: u64,
-    mid_kink: u64,
-    borrow_rate_on_high_kink: u64,
-    high_kink: u64,
-    max_borrow_rate: u64,
     revenue_factor: u64,
-    borrow_weight: u64,
     scale: u64,
     min_borrow_amount: u64,
     ctx: &mut TxContext,
@@ -176,13 +170,7 @@ public fun create_interest_model_change<T>(
         &admin_cap.interest_model_cap,
         base_rate_per_sec,
         interest_rate_scale,
-        borrow_rate_on_mid_kink,
-        mid_kink,
-        borrow_rate_on_high_kink,
-        high_kink,
-        max_borrow_rate,
         revenue_factor,
-        borrow_weight,
         scale,
         min_borrow_amount,
         admin_cap.interest_model_change_delay,
@@ -444,6 +432,15 @@ public fun take_staking_fee(
     });
 }
 
+public fun update_staking_cap(
+    _admin_cap: &AdminCap,
+    manager: &mut StakingManager,
+    new_cap: u64,
+    ctx: &mut TxContext,
+) {
+    staking_manager::update_stake_cap(manager, new_cap, ctx);
+}
+
 /// ======= Management of obligation access keys
 public fun add_lock_key<T: drop>(
     _admin_cap: &AdminCap,
@@ -530,3 +527,4 @@ public fun transfer_admin_cap(admin_cap: AdminCap, new_admin: address) {
 public fun set_flash_loan_single_cap(_admin_cap: &AdminCap, market: &mut Market, single_cap: u64) {
     market::set_flash_loan_single_cap(market, single_cap);
 }
+

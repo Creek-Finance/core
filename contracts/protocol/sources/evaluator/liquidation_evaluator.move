@@ -3,8 +3,7 @@ module protocol::liquidation_evaluator;
 use coin_decimals_registry::coin_decimals_registry::{Self, CoinDecimalsRegistry};
 use math::fixed_point32_empower;
 use protocol::collateral_value::collaterals_value_usd_for_liquidation;
-use protocol::debt_value::debts_value_usd_with_weight;
-use protocol::interest_model;
+use protocol::debt_value::debts_value_usd;
 use protocol::market::{Self, Market};
 use protocol::obligation::{Self, Obligation};
 use protocol::price::get_price;
@@ -80,8 +79,6 @@ public fun max_liquidation_amounts<DebtType, CollateralType>(
         collateral_type,
     );
     let collateral_scale = math::pow(10, collateral_decimals);
-    let interest_model = market::interest_model(market, debt_type);
-    let borrow_weight = interest_model::borrow_weight(interest_model);
     let risk_model = market::risk_model(market, collateral_type);
     let liq_penalty = risk_model::liq_penalty(risk_model);
     let liq_factor = risk_model::liq_factor(risk_model);
@@ -95,10 +92,9 @@ public fun max_liquidation_amounts<DebtType, CollateralType>(
         x_oracle,
         clock,
     );
-    let weighted_debts_value = debts_value_usd_with_weight(
+    let weighted_debts_value = debts_value_usd(
         obligation,
         coin_decimals_registry,
-        market,
         x_oracle,
         clock,
     );
@@ -108,16 +104,13 @@ public fun max_liquidation_amounts<DebtType, CollateralType>(
         return (0, 0)
     };
 
-    // max_liq_value = (weighted_debts_value - collaterals_value) / (borrow_weight * (1 - liq_penalty) - liq_factor)
+    // max_liq_value = (weighted_debts_value - collaterals_value) / ((1 - liq_penalty) - liq_factor)
     let max_liq_value = fixed_point32_empower::div(
         fixed_point32_empower::sub(weighted_debts_value, collaterals_value),
         fixed_point32_empower::sub(
-            fixed_point32_empower::mul(
-                borrow_weight,
-                fixed_point32_empower::sub(
-                    fixed_point32_empower::from_u64(1),
-                    liq_penalty,
-                ),
+            fixed_point32_empower::sub(
+                fixed_point32_empower::from_u64(1),
+                liq_penalty,
             ),
             liq_factor,
         ),

@@ -192,10 +192,9 @@ fun borrow_internal(
         x_oracle,
         clock,
     );
-    let debts_value = protocol::debt_value::debts_value_usd_with_weight(
+    let debts_value = protocol::debt_value::debts_value_usd(
         obligation,
         coin_decimals_registry,
-        market,
         x_oracle,
         clock,
     );

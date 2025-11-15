@@ -14,13 +14,7 @@ public struct InterestModel has copy, drop, store {
     asset_type: TypeName,
     base_borrow_rate_per_sec: FixedPoint32,
     interest_rate_scale: u64,
-    borrow_rate_on_mid_kink: FixedPoint32,
-    mid_kink: FixedPoint32,
-    borrow_rate_on_high_kink: FixedPoint32,
-    high_kink: FixedPoint32,
-    max_borrow_rate: FixedPoint32,
     revenue_factor: FixedPoint32,
-    borrow_weight: FixedPoint32,
     min_borrow_amount: u64,
 }
 
@@ -42,23 +36,7 @@ public fun base_borrow_rate(model: &InterestModel): FixedPoint32 { model.base_bo
 
 public fun interest_rate_scale(model: &InterestModel): u64 { model.interest_rate_scale }
 
-public fun borrow_rate_on_mid_kink(model: &InterestModel): FixedPoint32 {
-    model.borrow_rate_on_mid_kink
-}
-
-public fun mid_kink(model: &InterestModel): FixedPoint32 { model.mid_kink }
-
-public fun borrow_rate_on_high_kink(model: &InterestModel): FixedPoint32 {
-    model.borrow_rate_on_high_kink
-}
-
-public fun high_kink(model: &InterestModel): FixedPoint32 { model.high_kink }
-
-public fun max_borrow_rate(model: &InterestModel): FixedPoint32 { model.max_borrow_rate }
-
 public fun revenue_factor(model: &InterestModel): FixedPoint32 { model.revenue_factor }
-
-public fun borrow_weight(model: &InterestModel): FixedPoint32 { model.borrow_weight }
 
 public fun min_borrow_amount(model: &InterestModel): u64 { model.min_borrow_amount }
 
@@ -78,52 +56,22 @@ public(package) fun create_interest_model_change<T>(
     _: &AcTableCap<InterestModels>,
     base_rate_per_sec: u64,
     interest_rate_scale: u64,
-    borrow_rate_on_mid_kink: u64,
-    mid_kink: u64,
-    borrow_rate_on_high_kink: u64,
-    high_kink: u64,
-    max_borrow_rate: u64,
     revenue_factor: u64,
-    borrow_weight: u64,
     scale: u64,
     min_borrow_amount: u64,
     change_delay: u64,
     ctx: &mut TxContext,
 ): OneTimeLockValue<InterestModel> {
-    assert!(mid_kink <= high_kink, error::interest_model_param_error());
-    assert!(base_rate_per_sec <= borrow_rate_on_mid_kink, error::interest_model_param_error());
-    assert!(
-        borrow_rate_on_mid_kink <= borrow_rate_on_high_kink,
-        error::interest_model_param_error(),
-    );
-    assert!(borrow_rate_on_high_kink <= max_borrow_rate, error::interest_model_param_error());
 
     let base_borrow_rate_per_sec = fixed_point32::create_from_rational(base_rate_per_sec, scale);
-    let borrow_rate_on_mid_kink = fixed_point32::create_from_rational(
-        borrow_rate_on_mid_kink,
-        scale,
-    );
-    let mid_kink = fixed_point32::create_from_rational(mid_kink, scale);
-    let borrow_rate_on_high_kink = fixed_point32::create_from_rational(
-        borrow_rate_on_high_kink,
-        scale,
-    );
-    let high_kink = fixed_point32::create_from_rational(high_kink, scale);
-    let max_borrow_rate = fixed_point32::create_from_rational(max_borrow_rate, scale);
+   
     let revenue_factor = fixed_point32::create_from_rational(revenue_factor, scale);
-    let borrow_weight = fixed_point32::create_from_rational(borrow_weight, scale);
     let interest_model = InterestModel {
         asset_type: get<T>(),
         base_borrow_rate_per_sec,
         interest_rate_scale,
-        borrow_rate_on_mid_kink,
-        mid_kink,
-        borrow_rate_on_high_kink,
-        high_kink,
-        max_borrow_rate,
         revenue_factor,
         min_borrow_amount,
-        borrow_weight,
     };
     emit(InterestModelChangeCreated {
         interest_model,
