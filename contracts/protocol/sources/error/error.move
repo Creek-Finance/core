@@ -57,13 +57,12 @@ module protocol::error {
   // repay
   public fun zero_amount_error(): u64 { 0x0015001 }
   public fun no_debt_error(): u64 { 0x0015002 }
-  
+
 
   // market
   public fun market_paused_error(): u64 { 0x0016001 }
 
   // staking
-
   public fun staking_min_xaum_error(): u64 { 0x0017001 }
   public fun staking_gr_gy_mismatch_error(): u64 { 0x0017002 }
   public fun staking_insufficient_gr_gy_error(): u64 { 0x0017003 }
@@ -73,7 +72,10 @@ module protocol::error {
   public fun staking_pool_xaum_not_enough_error(): u64 { 0x0017006 }
   // Fee exceeds or equals amount which makes net amount non-positive
   public fun staking_fee_exceeds_amount_error(): u64 { 0x0017007 }
+  // GR/GY amount not divisible by EXCHANGE_RATE, causing rounding loss
   public fun staking_gr_amount_not_divisible_error(): u64 { 0x0017008 }
+  // Total staking cap exceeded
+  public fun staking_stake_cap_exceeded_error(): u64 { 0x0017009 }
 
   // app
   public fun invalid_reward_address_error(): u64 { 0x0018001 }

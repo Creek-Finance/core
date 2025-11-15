@@ -32,6 +32,8 @@ public struct StakingManager has key {
     stake_fee_rate: FixedPoint32,
     /// Unstaking fee rate for XAUM, expressed as FixedPoint32 (numerator/denominator)
     unstake_fee_rate: FixedPoint32,
+    /// Total staking cap for XAUM. 0 means no cap (unlimited).
+    stake_cap: u64,
     /// GR token supply - only StakingManager can mint GR
     gr_supply: Supply<COIN_GR>,
     /// GY token supply - only StakingManager can mint GY
@@ -82,6 +84,7 @@ public fun init_staking_manager(
         xaum_fee_pool: balance::zero(),
         stake_fee_rate: fixed_point32::create_from_rational(0, 1),
         unstake_fee_rate: fixed_point32::create_from_rational(0, 1),
+        stake_cap: 0, // 0 means no cap (unlimited)
         gr_supply,
         gy_supply,
     };
@@ -112,9 +115,16 @@ public fun stake_xaum(
     let mut xaum_balance = coin::into_balance(xaum_coin);
     let fee_balance = balance::split(&mut xaum_balance, fee_amount);
     balance::join(&mut manager.xaum_fee_pool, fee_balance);
-    balance::join(&mut manager.xaum_pool, xaum_balance);
-
+    
     let net_amount = xaum_amount - fee_amount;
+    
+    // Check staking cap if it's set (stake_cap > 0)
+    if (manager.stake_cap > 0) {
+        let current_pool_balance = balance::value(&manager.xaum_pool);
+        assert!(current_pool_balance + net_amount <= manager.stake_cap, error::staking_stake_cap_exceeded_error());
+    };
+    
+    balance::join(&mut manager.xaum_pool, xaum_balance);
     let gr_amount = net_amount * EXCHANGE_RATE;
     let gy_amount = net_amount * EXCHANGE_RATE;
 
@@ -151,6 +161,7 @@ public fun unstake(
     let min_gr_gy_amount = MIN_STAKE_AMOUNT * EXCHANGE_RATE;
     assert!(gr_amount >= min_gr_gy_amount, error::staking_insufficient_gr_gy_error());
 
+    // Ensure gr_amount is divisible by EXCHANGE_RATE to prevent rounding loss
     assert!(gr_amount % EXCHANGE_RATE == 0, error::staking_gr_amount_not_divisible_error());
 
     let xaum_return_amount = gr_amount / EXCHANGE_RATE;
@@ -209,6 +220,11 @@ public fun read_fee_pool_balance(manager: &StakingManager): u64 {
     balance::value(&manager.xaum_fee_pool)
 }
 
+/// Returns the staking cap. 0 means no cap (unlimited).
+public fun get_stake_cap(manager: &StakingManager): u64 {
+    manager.stake_cap
+}
+
 /// Update staking fee rate (numerator/denominator) by admin.
 /// Restricted to package-level access. Intended to be called by protocol::app.
 public(package) fun update_stake_fee(
@@ -245,6 +261,19 @@ public(package) fun take_stake_fee_coin(
 ): Coin<COIN_XAUM> {
     let fee_part = balance::split(&mut manager.xaum_fee_pool, amount);
     coin::from_balance(fee_part, ctx)
+}
+
+/// Update staking cap by admin.
+/// Restricted to package-level access. Intended to be called by protocol::app.
+/// Setting cap to 0 means no cap (unlimited).
+/// When reducing the cap, it doesn't check if current pool balance exceeds the new cap.
+public(package) fun update_stake_cap(
+    manager: &mut StakingManager,
+    new_cap: u64,
+    ctx: &mut TxContext,
+) {
+    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
+    manager.stake_cap = new_cap;
 }
 
 /// Event emitted when owner withdraws XAUM from pool
