@@ -17,6 +17,8 @@ const E_NOT_ADMIN: u64 = 3;
 const E_INVALID_FEE_RATE: u64 = 4;
 const E_OVERFLOW: u64 = 5;
 const E_INVALID_FEE: u64 = 6;
+const E_INVALID_ADDRESS: u64 = 7;
+const E_NOT_PENDING_ADMIN: u64 = 8;
 
 const U64_MAX: u128 = 18446744073709551615u128;
 
@@ -27,6 +29,7 @@ public struct USDCVault has key, store {
     team_address: address,
     fee_rate: u64, // Fee rate, scaled by 10000 (0.3% = 30)
     admin: address,
+    pending_admin: address,
 }
 
 // Event: GUSD minted
@@ -49,6 +52,11 @@ public struct AdminUpdatedEvent has copy, drop {
     new_admin: address,
 }
 
+public struct AdminProposedEvent has copy, drop {
+    old_admin: address,
+    proposed_admin: address,
+}
+
 // Event: Team address updated
 public struct TeamAddressUpdatedEvent has copy, drop {
     old_team_address: address,
@@ -69,6 +77,7 @@ fun init(ctx: &mut TxContext) {
         team_address: sender(ctx),
         fee_rate: 30, // Default fee rate = 0.3%
         admin: sender(ctx),
+        pending_admin: @0x0,
     };
     transfer::share_object(vault);
 }
@@ -165,6 +174,7 @@ public fun get_fee_rate(vault: &USDCVault): u64 {
 // Admin: update team address
 public fun update_team_address(vault: &mut USDCVault, new_address: address, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
+    assert!(new_address != @0x0, E_INVALID_ADDRESS);
     let old_team_address = vault.team_address;
     vault.team_address = new_address;
 
@@ -178,7 +188,8 @@ public fun update_team_address(vault: &mut USDCVault, new_address: address, ctx:
 public fun update_fee_rate(vault: &mut USDCVault, new_fee_rate: u64, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
     assert!(new_fee_rate > 0, E_INVALID_FEE_RATE);
-    assert!(new_fee_rate < 10000, E_INVALID_FEE_RATE);
+    // Max fee rate = 10%
+    assert!(new_fee_rate < 1000, E_INVALID_FEE_RATE);
     let old_fee_rate = vault.fee_rate;
     vault.fee_rate = new_fee_rate;
 
@@ -189,14 +200,30 @@ public fun update_fee_rate(vault: &mut USDCVault, new_fee_rate: u64, ctx: &mut T
 }
 
 // Admin: update admin address
-public fun update_admin(vault: &mut USDCVault, new_admin: address, ctx: &mut TxContext) {
+public fun propose_new_admin(vault: &mut USDCVault, new_admin: address, ctx: &mut TxContext) {
     assert!(sender(ctx) == vault.admin, E_NOT_ADMIN);
+    assert!(new_admin != @0x0, E_INVALID_ADDRESS);
+
+    // Set pending admin
+    vault.pending_admin = new_admin;
+
+    event::emit(AdminProposedEvent {
+        old_admin: vault.admin,
+        proposed_admin: new_admin,
+    });
+}
+
+// new admin accepts the role
+public fun accept_admin(vault: &mut USDCVault, ctx: &mut TxContext) {
+    let sender_address = sender(ctx);
+    assert!(vault.pending_admin == sender_address, E_NOT_PENDING_ADMIN);
 
     let old_admin = vault.admin;
-    vault.admin = new_admin;
+    vault.admin = sender_address;
+    vault.pending_admin = @0x0;
 
     event::emit(AdminUpdatedEvent {
         old_admin,
-        new_admin,
+        new_admin: sender_address,
     });
 }
