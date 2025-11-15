@@ -128,7 +128,7 @@ public(package) fun new(
         gusd_treasury_cap: option::none<TreasuryCap<COIN_GUSD>>(),
         paused: false,
         auto_pause_enabled: true,
-        auto_pause_threshold: fixed_point32::create_from_rational(8, 1000), // 0.8%
+        auto_pause_threshold: fixed_point32::create_from_rational(8, 100), // 8%
         flash_loan_single_cap: 50_000,
     };
     (market, interest_models_cap, risk_models_cap)

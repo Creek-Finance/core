@@ -117,10 +117,11 @@ public fun resume_protocol(_admin_cap: &AdminCap, market: &mut Market) {
     market::set_paused(market, false);
 }
 
-/// Anyone can call. If GUSD price deviates from 1 by >= 8%, auto-pause protocol.
-/// Deviation threshold: 0.08
+/// Anyone can call. If GUSD price deviates from 1 by >= the configured threshold
+/// (default 8%), auto-pause the protocol.
 public fun check_and_pause_if_gusd_depeg(market: &mut Market, x_oracle: &XOracle, clock: &Clock) {
     if (market::is_paused(market)) { return }; // already paused
+    if (!market::auto_pause_enabled(market)) { return };
 
     let price = price_eval::get_price(x_oracle, type_name::get<COIN_GUSD>(), clock);
     let one = fixed_point32_empower::from_u64(1);
@@ -129,7 +130,7 @@ public fun check_and_pause_if_gusd_depeg(market: &mut Market, x_oracle: &XOracle
     } else {
         fixed_point32_empower::sub(one, price)
     };
-    let tolerance = fixed_point32::create_from_rational(8, 100); // 0.08
+    let tolerance = market::auto_pause_threshold(market);
 
     if (fixed_point32_empower::gte(diff, tolerance)) {
         market::set_paused(market, true);
