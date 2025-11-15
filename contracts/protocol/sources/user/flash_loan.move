@@ -98,6 +98,7 @@ public fun repay_flash_loan(
 ) {
     // check if version is supported
     version::assert_current_version(version);
+    assert!(!market::is_paused(market), error::market_paused_error());
     assert!(coin::value(&repay_flash_coin) > 0, error::zero_amount_error());
 
     // Emit the repay flash loan event
