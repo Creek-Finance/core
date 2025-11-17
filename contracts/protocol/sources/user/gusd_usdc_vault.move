@@ -19,6 +19,7 @@ const E_OVERFLOW: u64 = 5;
 const E_INVALID_FEE: u64 = 6;
 const E_INVALID_ADDRESS: u64 = 7;
 const E_NOT_PENDING_ADMIN: u64 = 8;
+const E_IS_PAUSED: u64 = 9;
 
 const U64_MAX: u128 = 18446744073709551615u128;
 
@@ -90,6 +91,7 @@ public fun mint_gusd(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    assert!(!market::is_paused(market), E_IS_PAUSED);
     let amount = coin::value(&usdc);
     assert!(amount > 0, E_INVALID_AMOUNT);
 
@@ -116,6 +118,7 @@ public fun redeem_gusd(
     gusd: Coin<COIN_GUSD>,
     ctx: &mut TxContext,
 ) {
+    assert!(!market::is_paused(market), E_IS_PAUSED);
     let amount = coin::value(&gusd);
     assert!(amount > 0, E_INVALID_AMOUNT);
 
