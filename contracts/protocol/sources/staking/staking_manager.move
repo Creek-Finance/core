@@ -276,55 +276,26 @@ public(package) fun update_stake_cap(
     manager.stake_cap = new_cap;
 }
 
-/// Event emitted when owner withdraws XAUM from pool
-public struct OwnerWithdrawXAUMEvent has copy, drop {
-    manager: ID,
-    amount: u64,
-    sender: address,
-}
-
-/// Event emitted when owner deposits XAUM back to pool
-public struct OwnerDepositXAUMEvent has copy, drop {
-    manager: ID,
-    amount: u64,
-    sender: address,
-}
-
-/// Owner-only: withdraw XAUM from staking pool to owner wallet
-public fun owner_withdraw_xaum(
+/// Internal helper: withdraw XAUM from staking pool.
+/// Intended to be called by protocol::app which performs admin gating and event emission.
+/// Restricted to package-level access for security.
+public(package) fun owner_withdraw_xaum(
     manager: &mut StakingManager,
     amount: u64,
     ctx: &mut TxContext,
-) {
-    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
+): Coin<COIN_XAUM> {
     assert!(balance::value(&manager.xaum_pool) >= amount, error::staking_pool_xaum_not_enough_error());
-
     let part = balance::split(&mut manager.xaum_pool, amount);
-    let coin_out = coin::from_balance(part, ctx);
-
-    event::emit(OwnerWithdrawXAUMEvent {
-        manager: object::id(manager),
-        amount,
-        sender: tx_context::sender(ctx),
-    });
-
-    transfer::public_transfer(coin_out, tx_context::sender(ctx));
+    coin::from_balance(part, ctx)
 }
 
-/// Owner-only: deposit XAUM from owner wallet into staking pool
-public fun owner_deposit_xaum(
+/// Internal helper: deposit XAUM from owner wallet into staking pool.
+/// Intended to be called by protocol::app which performs admin gating and event emission.
+/// Restricted to package-level access for security.
+public(package) fun owner_deposit_xaum(
     manager: &mut StakingManager,
     xaum_coin: Coin<COIN_XAUM>,
-    ctx: &mut TxContext,
 ) {
-    assert!(tx_context::sender(ctx) == manager.admin, error::staking_not_admin_error());
     let xaum_balance = coin::into_balance(xaum_coin);
-    let amount = balance::value(&xaum_balance);
     balance::join(&mut manager.xaum_pool, xaum_balance);
-
-    event::emit(OwnerDepositXAUMEvent {
-        manager: object::id(manager),
-        amount,
-        sender: tx_context::sender(ctx),
-    });
 }

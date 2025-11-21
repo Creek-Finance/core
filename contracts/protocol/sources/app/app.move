@@ -66,6 +66,18 @@ public struct TakeStakingFeeEvent has copy, drop {
     recipient: address,
 }
 
+public struct OwnerWithdrawXAUMEvent has copy, drop {
+    manager: ID,
+    amount: u64,
+    sender: address,
+}
+
+public struct OwnerDepositXAUMEvent has copy, drop {
+    manager: ID,
+    amount: u64,
+    sender: address,
+}
+
 fun init(otw: APP, ctx: &mut TxContext) {
     init_internal(otw, ctx)
 }
@@ -441,6 +453,41 @@ public fun update_staking_cap(
     staking_manager::update_stake_cap(manager, new_cap, ctx);
 }
 
+/// Owner-only: withdraw XAUM from staking pool to admin wallet
+public fun owner_withdraw_xaum(
+    _admin_cap: &AdminCap,
+    manager: &mut StakingManager,
+    amount: u64,
+    ctx: &mut TxContext,
+) {
+    let sender = tx_context::sender(ctx);
+    let coin = staking_manager::owner_withdraw_xaum(manager, amount, ctx);
+    transfer::public_transfer(coin, sender);
+
+    event::emit(OwnerWithdrawXAUMEvent {
+        manager: object::id(manager),
+        amount,
+        sender,
+    });
+}
+
+/// Owner-only: deposit XAUM from owner wallet into staking pool
+public fun owner_deposit_xaum(
+    _admin_cap: &AdminCap,
+    manager: &mut StakingManager,
+    xaum_coin: Coin<COIN_XAUM>,
+    ctx: &mut TxContext,
+) {
+    let amount = coin::value(&xaum_coin);
+    staking_manager::owner_deposit_xaum(manager, xaum_coin);
+
+    event::emit(OwnerDepositXAUMEvent {
+        manager: object::id(manager),
+        amount,
+        sender: tx_context::sender(ctx),
+    });
+}
+
 /// ======= Management of obligation access keys
 public fun add_lock_key<T: drop>(
     _admin_cap: &AdminCap,
@@ -527,4 +574,3 @@ public fun transfer_admin_cap(admin_cap: AdminCap, new_admin: address) {
 public fun set_flash_loan_single_cap(_admin_cap: &AdminCap, market: &mut Market, single_cap: u64) {
     market::set_flash_loan_single_cap(market, single_cap);
 }
-
