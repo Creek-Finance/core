@@ -14,7 +14,7 @@ use protocol::staking_manager::{Self as staking_manager, StakingManager};
 use std::fixed_point32::{Self, FixedPoint32};
 use std::type_name::{Self, TypeName};
 use sui::clock::{Self, Clock};
-use sui::coin::{Self, TreasuryCap};
+use sui::coin::{Self, Coin, TreasuryCap};
 use sui::dynamic_field;
 use sui::event;
 use sui::package;
