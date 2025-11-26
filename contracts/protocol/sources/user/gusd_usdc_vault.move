@@ -3,6 +3,7 @@ module protocol::gusd_usdc_vault;
 use coin_gusd::coin_gusd::COIN_GUSD;
 use math::u64;
 use protocol::market::{Self, Market};
+use protocol::version::{Self, Version};
 use sui::balance::{Self, Balance};
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
@@ -85,13 +86,18 @@ fun init(ctx: &mut TxContext) {
 
 // Mint GUSD, only accepts USDC, calls the Market module
 public fun mint_gusd(
+    version: &Version,
     vault: &mut USDCVault,
     market: &mut Market,
     usdc: Coin<USDC>,
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
+    // check if version is supported
+    version::assert_current_version(version);
+
     assert!(!market::is_paused(market), E_IS_PAUSED);
+
     let amount = coin::value(&usdc);
     assert!(amount > 0, E_INVALID_AMOUNT);
 
@@ -113,11 +119,15 @@ public fun mint_gusd(
 
 // Redeem GUSD, burn GUSD to receive USDC, deducting 0.3% fee
 public fun redeem_gusd(
+    version: &Version,
     vault: &mut USDCVault,
     market: &mut Market,
     gusd: Coin<COIN_GUSD>,
     ctx: &mut TxContext,
 ) {
+    // check if version is supported
+    version::assert_current_version(version);
+
     assert!(!market::is_paused(market), E_IS_PAUSED);
     let amount = coin::value(&gusd);
     assert!(amount > 0, E_INVALID_AMOUNT);

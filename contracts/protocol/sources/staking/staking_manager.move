@@ -13,6 +13,7 @@ use sui::balance::{Self, Balance, Supply};
 use sui::coin::{Self, Coin, TreasuryCap};
 use sui::event;
 use protocol::error;
+use protocol::version::{Self, Version};
 
 /// Minimum stake amount: 0.001 XAUM (with 9 decimals).
 const MIN_STAKE_AMOUNT: u64 = 1_000_000;
@@ -100,10 +101,12 @@ public fun init_staking_manager(
 
 /// Stakes XAUM in exchange for GR and GY at the fixed exchange rate.
 public fun stake_xaum(
+    version: &Version,
     manager: &mut StakingManager,
     xaum_coin: Coin<COIN_XAUM>,
     ctx: &mut TxContext,
 ) {
+    version::assert_current_version(version);
     let user = tx_context::sender(ctx);
     let xaum_amount = coin::value(&xaum_coin);
     assert!(xaum_amount >= MIN_STAKE_AMOUNT, error::staking_min_xaum_error());
@@ -147,11 +150,13 @@ public fun stake_xaum(
 
 /// Unstakes by burning GR and GY to redeem XAUM.
 public fun unstake(
+    version: &Version,
     manager: &mut StakingManager,
     gr_coin: Coin<COIN_GR>,
     gy_coin: Coin<COIN_GY>,
     ctx: &mut TxContext,
 ) {
+    version::assert_current_version(version);
     let user = tx_context::sender(ctx);
     let gr_amount = coin::value(&gr_coin);
     let gy_amount = coin::value(&gy_coin);
