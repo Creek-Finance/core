@@ -198,7 +198,13 @@ public fun add_interest_model<T>(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
-    update_interest_model<T>(market, admin_cap, interest_model_change, ctx);
+    let interest_models = market::interest_models_mut(market);
+    interest_model::add_interest_model<T>(
+        interest_models,
+        &admin_cap.interest_model_cap,
+        interest_model_change,
+        ctx,
+    );
     let now = clock::timestamp_ms(clock) / 1000;
     market::register_coin<T>(market, now);
 }
@@ -216,6 +222,7 @@ public fun update_interest_model<T>(
         interest_model_change,
         ctx,
     );
+    market::update_interest_rates<T>(market);
 }
 
 public fun create_risk_model_change<T>(
@@ -388,6 +395,7 @@ public fun take_borrow_fee<T>(
     amount: u64,
     ctx: &mut TxContext,
 ) {
+    assert!(amount > 0, error::zero_amount_error());
     assert!(admin_cap.reward_address != @0x0, error::invalid_reward_address_error());
 
     let coin = market::take_borrow_fee<T>(market, amount, ctx);
@@ -431,6 +439,7 @@ public fun take_staking_fee(
     amount: u64,
     ctx: &mut TxContext,
 ) {
+    assert!(amount > 0, error::zero_amount_error());
     assert!(admin_cap.reward_address != @0x0, error::invalid_reward_address_error());
 
     let coin = staking_manager::take_stake_fee_coin(manager, amount, ctx);
@@ -460,6 +469,7 @@ public fun owner_withdraw_xaum(
     amount: u64,
     ctx: &mut TxContext,
 ) {
+    assert!(amount > 0, error::zero_amount_error());
     let sender = tx_context::sender(ctx);
     let coin = staking_manager::owner_withdraw_xaum(manager, amount, ctx);
     transfer::public_transfer(coin, sender);
@@ -479,6 +489,7 @@ public fun owner_deposit_xaum(
     ctx: &mut TxContext,
 ) {
     let amount = coin::value(&xaum_coin);
+    assert!(amount > 0, error::zero_amount_error());
     staking_manager::owner_deposit_xaum(manager, xaum_coin);
 
     event::emit(OwnerDepositXAUMEvent {

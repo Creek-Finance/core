@@ -83,3 +83,14 @@ public(package) fun update_borrow_index(
     debt_dynamic.borrow_index = debt_dynamic.borrow_index + index_delta;
     debt_dynamic.last_updated = now;
 }
+
+public(package) fun update_interest_rate(
+    self: &mut WitTable<BorrowDynamics, TypeName, BorrowDynamic>,
+    type_name: TypeName,
+    new_interest_rate: FixedPoint32,
+    interest_rate_scale: u64,
+) {
+    let debt_dynamic = wit_table::borrow_mut(BorrowDynamics {}, self, type_name);
+    debt_dynamic.interest_rate = new_interest_rate;
+    debt_dynamic.interest_rate_scale = interest_rate_scale;
+}

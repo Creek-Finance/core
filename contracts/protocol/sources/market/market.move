@@ -411,3 +411,18 @@ public(package) fun handle_borrow(
     reserve::handle_borrow<COIN_GUSD>(&mut self.vault, amount);
     coin
 }
+
+public(package) fun update_interest_rates<T>(self: &mut Market) {
+    let asset_type = get<T>();
+
+    let interest_model = ac_table::borrow(&self.interest_models, asset_type);
+    let base_interest_rate = interest_model::base_borrow_rate(interest_model);
+    let interest_rate_scale = interest_model::interest_rate_scale(interest_model);
+
+    borrow_dynamics::update_interest_rate(
+        &mut self.borrow_dynamics,
+        asset_type,
+        base_interest_rate,
+        interest_rate_scale,
+    );
+}
