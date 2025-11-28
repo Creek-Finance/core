@@ -21,7 +21,6 @@ const FLASH_LOAN_FEE_NUM: u64 = 1;
 public struct BalanceSheet has copy, store {
     debt: u64,
     revenue: u64,
-    market_coin_supply: u64,
 }
 
 public struct FlashLoan<phantom T> {
@@ -33,16 +32,13 @@ public struct MarketCoin<phantom T> has drop {}
 
 public struct Reserve has key, store {
     id: UID,
-    market_coin_supplies: SupplyBag,
-    underlying_balances: BalanceBag,
+    revenue_balances: BalanceBag,
     balance_sheets: WitTable<BalanceSheets, TypeName, BalanceSheet>,
 }
 
 public struct BorrowFeeVaultKey has copy, drop, store {}
 
-public fun market_coin_supplies(vault: &Reserve): &SupplyBag { &vault.market_coin_supplies }
-
-public fun underlying_balances(vault: &Reserve): &BalanceBag { &vault.underlying_balances }
+public fun revenue_balances(vault: &Reserve): &BalanceBag { &vault.revenue_balances }
 
 public fun balance_sheets(vault: &Reserve): &WitTable<BalanceSheets, TypeName, BalanceSheet> {
     &vault.balance_sheets
@@ -52,23 +48,21 @@ public fun asset_types(self: &Reserve): vector<TypeName> {
     wit_table::keys(&self.balance_sheets)
 }
 
-public fun balance_sheet(balance_sheet: &BalanceSheet): (u64, u64, u64) {
-    (balance_sheet.debt, balance_sheet.revenue, balance_sheet.market_coin_supply)
+public fun balance_sheet(balance_sheet: &BalanceSheet): (u64, u64) {
+    (balance_sheet.debt, balance_sheet.revenue)
 }
 
 public(package) fun new(ctx: &mut TxContext): Reserve {
     Reserve {
         id: object::new(ctx),
-        market_coin_supplies: supply_bag::new(ctx),
-        underlying_balances: balance_bag::new(ctx),
+        revenue_balances: balance_bag::new(ctx),
         balance_sheets: wit_table::new(BalanceSheets {}, true, ctx),
     }
 }
 
 public(package) fun register_coin<T>(self: &mut Reserve) {
-    supply_bag::init_supply(MarketCoin<T> {}, &mut self.market_coin_supplies);
-    balance_bag::init_balance<T>(&mut self.underlying_balances);
-    let balance_sheet = BalanceSheet { debt: 0, revenue: 0, market_coin_supply: 0 };
+    balance_bag::init_balance<T>(&mut self.revenue_balances);
+    let balance_sheet = BalanceSheet { debt: 0, revenue: 0 };
     wit_table::add(BalanceSheets {}, &mut self.balance_sheets, get<T>(), balance_sheet);
 }
 
@@ -76,7 +70,6 @@ public(package) fun increase_debt(
     self: &mut Reserve,
     debt_type: TypeName,
     debt_increase_rate: FixedPoint32,
-    revenue_factor: FixedPoint32,
 ) {
     let balance_sheet = wit_table::borrow_mut(
         BalanceSheets {},
@@ -84,23 +77,26 @@ public(package) fun increase_debt(
         debt_type,
     );
     let debt_increased = fixed_point32::multiply_u64(balance_sheet.debt, debt_increase_rate);
-    let revenue_increased = fixed_point32::multiply_u64(debt_increased, revenue_factor);
     balance_sheet.debt = balance_sheet.debt + debt_increased;
-    balance_sheet.revenue = balance_sheet.revenue + revenue_increased;
+    balance_sheet.revenue = balance_sheet.revenue + debt_increased;
 }
 
-public(package) fun handle_repay<T>(self: &mut Reserve, coin: Coin<COIN_GUSD>): Balance<COIN_GUSD> {
+public(package) fun handle_repay<T>(
+    self: &mut Reserve,
+    coin: Coin<COIN_GUSD>,
+    debt_interest: u64,
+): Balance<COIN_GUSD> {
     let mut balance = coin::into_balance(coin);
     let repay_amount = balance::value(&balance);
     let balance_sheet = wit_table::borrow_mut(BalanceSheets {}, &mut self.balance_sheets, get<T>());
 
     // calculate how much debt and interest to keep
-    let debt_to_burn = if (balance_sheet.debt >= repay_amount) {
+    let debt_amount = if (balance_sheet.debt >= repay_amount) {
         repay_amount
     } else {
         balance_sheet.debt
     };
-    let interest_to_keep = repay_amount - debt_to_burn;
+    let interest_to_keep = repay_amount - debt_amount;
 
     // update balance sheet
     if (balance_sheet.debt >= repay_amount) {
@@ -113,14 +109,21 @@ public(package) fun handle_repay<T>(self: &mut Reserve, coin: Coin<COIN_GUSD>): 
     if (interest_to_keep > 0) {
         balance_sheet.revenue = balance_sheet.revenue + interest_to_keep;
     };
+    let debt_to_burn = debt_amount - debt_interest;
+
+    if (debt_to_burn <= 0) {
+        // all repay amount is interest
+        balance_bag::join(&mut self.revenue_balances, balance);
+        return balance::zero<COIN_GUSD>()
+    };
 
     // split the balance into debt part and interest part
     let debt_balance = balance::split(&mut balance, debt_to_burn);
     let interest_balance = balance; // interest part
-
+    let total_interest = interest_to_keep + debt_interest;
     // keep the interest part in the reserve's underlying balances
-    if (interest_to_keep > 0) {
-        balance_bag::join(&mut self.underlying_balances, interest_balance);
+    if (total_interest > 0) {
+        balance_bag::join(&mut self.revenue_balances, interest_balance);
     } else {
         balance::destroy_zero(interest_balance); // if no interest, destroy the zero balance
     };
@@ -142,6 +145,7 @@ public(package) fun handle_liquidation<T>(
     self: &mut Reserve,
     mut repay_balance: Balance<T>,
     revenue_balance: Balance<T>,
+    repay_interest: u64,
 ): Balance<T> {
     let balance_sheet = wit_table::borrow_mut(BalanceSheets {}, &mut self.balance_sheets, get<T>());
 
@@ -149,25 +153,35 @@ public(package) fun handle_liquidation<T>(
     let total_amount = balance::value(&repay_balance) + balance::value(&revenue_balance);
 
     // calculate how much debt and interest to keep
-    let debt_to_burn = if (balance_sheet.debt >= total_amount) { total_amount } else {
+    let debt_amount = if (balance_sheet.debt >= total_amount) {
+        total_amount
+    } else {
         balance_sheet.debt
     };
-    let interest_to_keep = total_amount - debt_to_burn;
+    let interest_to_keep = total_amount - debt_amount;
 
     // update balance sheet
-    balance_sheet.debt = balance_sheet.debt - debt_to_burn;
+    balance_sheet.debt = balance_sheet.debt - debt_amount;
     if (interest_to_keep > 0) {
         balance_sheet.revenue = balance_sheet.revenue + interest_to_keep;
     };
     // combine repay_balance and revenue_balance
     balance::join(&mut repay_balance, revenue_balance);
 
+    let debt_to_burn = debt_amount - repay_interest;
+
+    if (debt_to_burn <= 0) {
+        // all repay amount is interest
+        balance_bag::join(&mut self.revenue_balances, repay_balance);
+        return balance::zero<T>()
+    };
+
     // split the repay_balance into principal part and interest part
     let principal_balance = balance::split(&mut repay_balance, debt_to_burn);
 
-    // The remaining balance (interest_to_keep) goes to underlying_balances
+    // The remaining balance (interest_to_keep) goes to revenue_balances
     if (balance::value(&repay_balance) > 0) {
-        balance_bag::join(&mut self.underlying_balances, repay_balance);
+        balance_bag::join(&mut self.revenue_balances, repay_balance);
     } else {
         balance::destroy_zero(repay_balance);
     };
@@ -177,12 +191,12 @@ public(package) fun handle_liquidation<T>(
 
 public(package) fun take_revenue<T>(self: &mut Reserve, amount: u64, ctx: &mut TxContext): Coin<T> {
     let balance_sheet = wit_table::borrow_mut(BalanceSheets {}, &mut self.balance_sheets, get<T>());
-    let all_revenue = balance_sheet.revenue;
-    let take_amount = math::min(amount, all_revenue);
+    let actual_balance = balance_bag::value<T>(&self.revenue_balances);
+    let take_amount = math::min(amount, actual_balance);
 
     balance_sheet.revenue = balance_sheet.revenue - take_amount;
 
-    let balance = balance_bag::split<T>(&mut self.underlying_balances, take_amount);
+    let balance = balance_bag::split<T>(&mut self.revenue_balances, take_amount);
     coin::from_balance(balance, ctx)
 }
 
@@ -233,7 +247,7 @@ public(package) fun repay_flash_loan(
 
     //The remaining part = fee (the excess of the handling fee)
     let fee_balance = repay_balance;
-    balance_bag::join(&mut self.underlying_balances, fee_balance);
+    balance_bag::join(&mut self.revenue_balances, fee_balance);
 
     // Update the balance sheet
     let balance_sheet = wit_table::borrow_mut(

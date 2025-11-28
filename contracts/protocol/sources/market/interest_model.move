@@ -14,7 +14,6 @@ public struct InterestModel has copy, drop, store {
     asset_type: TypeName,
     base_borrow_rate_per_sec: FixedPoint32,
     interest_rate_scale: u64,
-    revenue_factor: FixedPoint32,
     min_borrow_amount: u64,
 }
 
@@ -36,8 +35,6 @@ public fun base_borrow_rate(model: &InterestModel): FixedPoint32 { model.base_bo
 
 public fun interest_rate_scale(model: &InterestModel): u64 { model.interest_rate_scale }
 
-public fun revenue_factor(model: &InterestModel): FixedPoint32 { model.revenue_factor }
-
 public fun min_borrow_amount(model: &InterestModel): u64 { model.min_borrow_amount }
 
 public fun asset_type(model: &InterestModel): TypeName { model.asset_type }
@@ -56,7 +53,6 @@ public(package) fun create_interest_model_change<T>(
     _: &AcTableCap<InterestModels>,
     base_rate_per_sec: u64,
     interest_rate_scale: u64,
-    revenue_factor: u64,
     scale: u64,
     min_borrow_amount: u64,
     change_delay: u64,
@@ -65,12 +61,10 @@ public(package) fun create_interest_model_change<T>(
 
     let base_borrow_rate_per_sec = fixed_point32::create_from_rational(base_rate_per_sec, scale);
    
-    let revenue_factor = fixed_point32::create_from_rational(revenue_factor, scale);
     let interest_model = InterestModel {
         asset_type: get<T>(),
         base_borrow_rate_per_sec,
         interest_rate_scale,
-        revenue_factor,
         min_borrow_amount,
     };
     emit(InterestModelChangeCreated {

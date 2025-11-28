@@ -71,7 +71,7 @@ public fun collateral_stats(market: &Market): &WitTable<CollateralStats, TypeNam
 
 public fun total_global_debt(market: &Market, pool_type: TypeName): u64 {
     let balance_sheet = wit_table::borrow(reserve::balance_sheets(&market.vault), pool_type);
-    let (debt, _, _) = reserve::balance_sheet(balance_sheet);
+    let (debt, _) = reserve::balance_sheet(balance_sheet);
     debt
 }
 
@@ -222,10 +222,11 @@ public(package) fun set_auto_pause_threshold(
 public(package) fun handle_repay<T>(
     self: &mut Market,
     repay_coin: Coin<COIN_GUSD>,
+    debt_interest: u64,
     ctx: &mut TxContext,
 ) {
     // Obtain the Coin of the debt portion that needs to be burn
-    let debt_balance = reserve::handle_repay<T>(&mut self.vault, repay_coin);
+    let debt_balance = reserve::handle_repay<T>(&mut self.vault, repay_coin, debt_interest);
     if (balance::value(&debt_balance) > 0) {
         let debt_coin = coin::from_balance(debt_balance, ctx);
         burn_gusd(self, debt_coin, ctx); // burn the debt portion
@@ -259,17 +260,26 @@ public(package) fun handle_liquidation<CollateralType>(
     repay_balance: Balance<COIN_GUSD>,
     revenue_balance: Balance<COIN_GUSD>,
     liquidate_amount: u64,
+    repay_interest: u64,
     ctx: &mut TxContext,
 ) {
     let principal_balance = reserve::handle_liquidation(
         &mut self.vault,
         repay_balance,
         revenue_balance,
+        repay_interest,
     );
-
+    if (balance::value(&principal_balance) == 0) {
+        balance::destroy_zero(principal_balance);
+        collateral_stats::decrease(
+            &mut self.collateral_stats,
+            get<CollateralType>(),
+            liquidate_amount,
+        );
+        return
+    };
     let principal_coin = coin::from_balance(principal_balance, ctx);
     burn_gusd(self, principal_coin, ctx); // burn the principal portion
-
     collateral_stats::decrease(&mut self.collateral_stats, get<CollateralType>(), liquidate_amount);
 }
 
@@ -325,10 +335,7 @@ public(package) fun accrue_all_interests(self: &mut Market, now: u64) {
             fixed_point32_empower::from_u64(1),
         );
 
-        let interest_model = ac_table::borrow(&self.interest_models, type_name);
-        let revenue_factor = interest_model::revenue_factor(interest_model);
-
-        reserve::increase_debt(&mut self.vault, type_name, debt_increase_rate, revenue_factor);
+        reserve::increase_debt(&mut self.vault, type_name, debt_increase_rate);
 
         i = i + 1;
     };
