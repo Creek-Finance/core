@@ -18,7 +18,7 @@ use sui::coin::{Self, Coin, TreasuryCap};
 use sui::dynamic_field;
 use sui::event;
 use sui::package;
-use test_coin::coin_xaum::COIN_XAUM;
+use xaum::xaum::XAUM;
 use x::ac_table::AcTableCap;
 use x::one_time_lock_value::OneTimeLockValue;
 use x_oracle::x_oracle::XOracle;
@@ -173,7 +173,6 @@ public fun create_interest_model_change<T>(
     admin_cap: &AdminCap,
     base_rate_per_sec: u64,
     interest_rate_scale: u64,
-    revenue_factor: u64,
     scale: u64,
     min_borrow_amount: u64,
     ctx: &mut TxContext,
@@ -182,7 +181,6 @@ public fun create_interest_model_change<T>(
         &admin_cap.interest_model_cap,
         base_rate_per_sec,
         interest_rate_scale,
-        revenue_factor,
         scale,
         min_borrow_amount,
         admin_cap.interest_model_change_delay,
@@ -447,7 +445,7 @@ public fun take_staking_fee(
     event::emit(TakeStakingFeeEvent {
         manager: object::id(manager),
         amount,
-        coin_type: type_name::get<COIN_XAUM>(),
+        coin_type: type_name::get<XAUM>(),
         sender: tx_context::sender(ctx),
         recipient: admin_cap.reward_address,
     });
@@ -485,7 +483,7 @@ public fun owner_withdraw_xaum(
 public fun owner_deposit_xaum(
     _admin_cap: &AdminCap,
     manager: &mut StakingManager,
-    xaum_coin: Coin<COIN_XAUM>,
+    xaum_coin: Coin<XAUM>,
     ctx: &mut TxContext,
 ) {
     let amount = coin::value(&xaum_coin);

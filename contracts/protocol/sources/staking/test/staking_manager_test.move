@@ -6,17 +6,17 @@ module protocol::staking_manager_test {
 
     use coin_gr::coin_gr;
     use coin_gy::coin_gy;
-    use test_coin::coin_xaum;
+    use xaum::xaum::{Self as xaum, Treasury, XAUM};
     use protocol::staking_manager;
     use std::fixed_point32 as fixed_point32;
 
     const ADMIN: address = @0xAA;
     const USER: address = @0xBB;
 
-    // Initialize StakingManager and XAUM GlobalMintCap (test-only helpers)
+    // Initialize StakingManager and XAUM Treasury (test-only helpers)
     fun init_env(
         scenario: &mut test_scenario::Scenario,
-    ): (staking_manager::StakingManager, coin_xaum::GlobalMintCap) {
+    ): (staking_manager::StakingManager, Treasury) {
         // Create GR/GY TreasuryCaps and initialize StakingManager (shared object)
         let gr_tc = coin_gr::create_treasury_for_testing(test_scenario::ctx(scenario));
         let gy_tc = coin_gy::create_treasury_for_testing(test_scenario::ctx(scenario));
@@ -26,24 +26,25 @@ module protocol::staking_manager_test {
         // Fetch the shared StakingManager
         let mgr = test_scenario::take_shared<staking_manager::StakingManager>(scenario);
 
-        // Ensure XAUM GlobalMintCap exists and is shared
-        coin_xaum::create_global_mint_cap_for_testing(test_scenario::ctx(scenario));
+        // Ensure XAUM Treasury exists and is shared (created during package init)
+        // In test scenario, we need to create it manually
+        xaum::init(XAUM {}, test_scenario::ctx(scenario));
         test_scenario::next_tx(scenario, ADMIN);
-        let xaum_gmc = test_scenario::take_shared<coin_xaum::GlobalMintCap>(scenario);
+        let xaum_treasury = test_scenario::take_shared<Treasury>(scenario);
 
-        (mgr, xaum_gmc)
+        (mgr, xaum_treasury)
     }
 
     // Mint XAUM for the given user and stake; advance one tx so GR/GY are retrievable
     fun stake_for_user(
         scenario: &mut test_scenario::Scenario,
         mgr: &mut staking_manager::StakingManager,
-        xaum_gmc: &mut coin_xaum::GlobalMintCap,
+        xaum_treasury: &mut Treasury,
         user: address,
         amount: u64,
     ) {
         test_scenario::next_tx(scenario, user);
-        let xaum = coin_xaum::mint_coin_for_testing(xaum_gmc, amount, test_scenario::ctx(scenario));
+        let xaum = xaum::mint_coin_for_testing(xaum_treasury, amount, test_scenario::ctx(scenario));
         staking_manager::stake_xaum(mgr, xaum, test_scenario::ctx(scenario));
         test_scenario::next_tx(scenario, user);
     }
@@ -54,11 +55,11 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        // Setup: shared StakingManager and XAUM GlobalMintCap
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        // Setup: shared StakingManager and XAUM Treasury
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
 
         // Stake 1 XAUM for USER
-        stake_for_user(scenario, &mut mgr, &mut xaum_gmc, USER, 1_000_000_000);
+        stake_for_user(scenario, &mut mgr, &mut xaum_treasury, USER, 1_000_000_000);
 
         // Expect GR/GY minted to USER; withdraw and destroy them
         let gr_coin = test_scenario::take_from_address<coin::Coin<coin_gr::COIN_GR>>(scenario, USER);
@@ -68,7 +69,7 @@ module protocol::staking_manager_test {
 
         // Cleanup
         sui_test_utils::destroy(mgr);
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         test_scenario::end(scenario_value);
     }
 
@@ -78,9 +79,9 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
         // Mint XAUM for USER and stake to get matched GR/GY
-        stake_for_user(scenario, &mut mgr, &mut xaum_gmc, USER, 2_000_000); // 0.002 XAUM (>= MIN)
+        stake_for_user(scenario, &mut mgr, &mut xaum_treasury, USER, 2_000_000); // 0.002 XAUM (>= MIN)
 
         // Take minted GR/GY
         let mut gr = test_scenario::take_from_address<coin::Coin<coin_gr::COIN_GR>>(scenario, USER);
@@ -91,7 +92,7 @@ module protocol::staking_manager_test {
         staking_manager::unstake(&mut mgr, gr_small, gy, test_scenario::ctx(scenario));
 
         // Cleanup
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         sui_test_utils::destroy(gr);
         sui_test_utils::destroy(mgr);
         test_scenario::end(scenario_value);
@@ -103,14 +104,14 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
 
         // Set stake fee to 1%
         test_scenario::next_tx(scenario, ADMIN);
         staking_manager::update_stake_fee(&mut mgr, 1, 100, test_scenario::ctx(scenario));
 
         // USER stakes 1 XAUM
-        stake_for_user(scenario, &mut mgr, &mut xaum_gmc, USER, 1_000_000_000);
+        stake_for_user(scenario, &mut mgr, &mut xaum_treasury, USER, 1_000_000_000);
 
         // Compute expected fee/net using same fixed_point32 logic
         let amount = 1_000_000_000;
@@ -127,7 +128,7 @@ module protocol::staking_manager_test {
         test_scenario::next_tx(scenario, ADMIN);
         staking_manager::owner_withdraw_xaum(&mut mgr, net_expected, test_scenario::ctx(scenario));
         test_scenario::next_tx(scenario, ADMIN);
-        let admin_xaum = test_scenario::take_from_address<coin::Coin<coin_xaum::COIN_XAUM>>(scenario, ADMIN);
+        let admin_xaum = test_scenario::take_from_address<coin::Coin<XAUM>>(scenario, ADMIN);
         sui_test_utils::destroy(admin_xaum);
 
         // Pool should be zero now; fee pool remains intact
@@ -136,7 +137,7 @@ module protocol::staking_manager_test {
 
         // Cleanup
         sui_test_utils::destroy(mgr);
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         test_scenario::end(scenario_value);
     }
 
@@ -146,14 +147,14 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
 
         // Set stake fee to 1%
         test_scenario::next_tx(scenario, ADMIN);
         staking_manager::update_stake_fee(&mut mgr, 1, 100, test_scenario::ctx(scenario));
 
         // USER stakes 1 XAUM (net goes into pool)
-        stake_for_user(scenario, &mut mgr, &mut xaum_gmc, USER, 1_000_000_000);
+        stake_for_user(scenario, &mut mgr, &mut xaum_treasury, USER, 1_000_000_000);
 
         // Compute net and withdraw all
         let amount = 1_000_000_000;
@@ -164,7 +165,7 @@ module protocol::staking_manager_test {
         test_scenario::next_tx(scenario, ADMIN);
         staking_manager::owner_withdraw_xaum(&mut mgr, net_expected, test_scenario::ctx(scenario));
         test_scenario::next_tx(scenario, ADMIN);
-        let admin_xaum = test_scenario::take_from_address<coin::Coin<coin_xaum::COIN_XAUM>>(scenario, ADMIN);
+        let admin_xaum = test_scenario::take_from_address<coin::Coin<XAUM>>(scenario, ADMIN);
         sui_test_utils::destroy(admin_xaum);
 
         // USER attempts to unstake: should fail due to insufficient XAUM in pool
@@ -175,7 +176,7 @@ module protocol::staking_manager_test {
 
         // Cleanup (unreachable)
         sui_test_utils::destroy(mgr);
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         test_scenario::end(scenario_value);
     }
 
@@ -185,14 +186,14 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
 
         // Set stake fee to 1%
         test_scenario::next_tx(scenario, ADMIN);
         staking_manager::update_stake_fee(&mut mgr, 1, 100, test_scenario::ctx(scenario));
 
         // USER stakes 1 XAUM
-        stake_for_user(scenario, &mut mgr, &mut xaum_gmc, USER, 1_000_000_000);
+        stake_for_user(scenario, &mut mgr, &mut xaum_treasury, USER, 1_000_000_000);
 
         // Compute net and withdraw all
         let amount = 1_000_000_000;
@@ -203,7 +204,7 @@ module protocol::staking_manager_test {
         test_scenario::next_tx(scenario, ADMIN);
         staking_manager::owner_withdraw_xaum(&mut mgr, net_expected, test_scenario::ctx(scenario));
         test_scenario::next_tx(scenario, ADMIN);
-        let admin_xaum = test_scenario::take_from_address<coin::Coin<coin_xaum::COIN_XAUM>>(scenario, ADMIN);
+        let admin_xaum = test_scenario::take_from_address<coin::Coin<XAUM>>(scenario, ADMIN);
 
         // Admin deposits back a sufficient amount (>= user's net)
         test_scenario::next_tx(scenario, ADMIN);
@@ -217,7 +218,7 @@ module protocol::staking_manager_test {
 
         // Cleanup
         sui_test_utils::destroy(mgr);
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         test_scenario::end(scenario_value);
     }
 
@@ -227,7 +228,7 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
 
         // USER tries to withdraw from pool -> should fail (not admin)
         test_scenario::next_tx(scenario, USER);
@@ -235,7 +236,7 @@ module protocol::staking_manager_test {
 
         // Cleanup (unreachable)
         sui_test_utils::destroy(mgr);
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         test_scenario::end(scenario_value);
     }
 
@@ -245,16 +246,16 @@ module protocol::staking_manager_test {
         let mut scenario_value = test_scenario::begin(ADMIN);
         let scenario = &mut scenario_value;
 
-        let (mut mgr, mut xaum_gmc) = init_env(scenario);
+        let (mut mgr, mut xaum_treasury) = init_env(scenario);
 
         // USER mints a small XAUM and tries to deposit -> should fail
         test_scenario::next_tx(scenario, USER);
-        let user_xaum = coin_xaum::mint_coin_for_testing(&mut xaum_gmc, 1_000, test_scenario::ctx(scenario));
+        let user_xaum = xaum::mint_coin_for_testing(&mut xaum_treasury, 1_000, test_scenario::ctx(scenario));
         staking_manager::owner_deposit_xaum(&mut mgr, user_xaum, test_scenario::ctx(scenario));
 
         // Cleanup (unreachable)
         sui_test_utils::destroy(mgr);
-        sui_test_utils::destroy(xaum_gmc);
+        sui_test_utils::destroy(xaum_treasury);
         test_scenario::end(scenario_value);
     }
 }

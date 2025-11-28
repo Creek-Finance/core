@@ -7,7 +7,7 @@ module protocol::staking_manager;
 
 use coin_gr::coin_gr::{Self, COIN_GR};
 use coin_gy::coin_gy::{Self, COIN_GY};
-use test_coin::coin_xaum::COIN_XAUM;
+use xaum::xaum::XAUM;
 use std::fixed_point32::{Self, FixedPoint32};
 use sui::balance::{Self, Balance, Supply};
 use sui::coin::{Self, Coin, TreasuryCap};
@@ -26,9 +26,9 @@ public struct StakingManager has key {
     id: UID,
     admin: address,
     /// XAUM staking pool balance.
-    xaum_pool: Balance<COIN_XAUM>,
+    xaum_pool: Balance<XAUM>,
     /// XAUM fee pool balance (accumulated fees from stake/unstake)
-    xaum_fee_pool: Balance<COIN_XAUM>,
+    xaum_fee_pool: Balance<XAUM>,
     /// Staking fee rate for XAUM, expressed as FixedPoint32 (numerator/denominator)
     stake_fee_rate: FixedPoint32,
     /// Unstaking fee rate for XAUM, expressed as FixedPoint32 (numerator/denominator)
@@ -103,7 +103,7 @@ public fun init_staking_manager(
 public fun stake_xaum(
     version: &Version,
     manager: &mut StakingManager,
-    xaum_coin: Coin<COIN_XAUM>,
+    xaum_coin: Coin<XAUM>,
     ctx: &mut TxContext,
 ) {
     version::assert_current_version(version);
@@ -263,7 +263,7 @@ public(package) fun take_stake_fee_coin(
     manager: &mut StakingManager,
     amount: u64,
     ctx: &mut TxContext,
-): Coin<COIN_XAUM> {
+): Coin<XAUM> {
     let fee_part = balance::split(&mut manager.xaum_fee_pool, amount);
     coin::from_balance(fee_part, ctx)
 }
@@ -288,7 +288,7 @@ public(package) fun owner_withdraw_xaum(
     manager: &mut StakingManager,
     amount: u64,
     ctx: &mut TxContext,
-): Coin<COIN_XAUM> {
+): Coin<XAUM> {
     assert!(balance::value(&manager.xaum_pool) >= amount, error::staking_pool_xaum_not_enough_error());
     let part = balance::split(&mut manager.xaum_pool, amount);
     coin::from_balance(part, ctx)
@@ -299,7 +299,7 @@ public(package) fun owner_withdraw_xaum(
 /// Restricted to package-level access for security.
 public(package) fun owner_deposit_xaum(
     manager: &mut StakingManager,
-    xaum_coin: Coin<COIN_XAUM>,
+    xaum_coin: Coin<XAUM>,
 ) {
     let xaum_balance = coin::into_balance(xaum_coin);
     balance::join(&mut manager.xaum_pool, xaum_balance);

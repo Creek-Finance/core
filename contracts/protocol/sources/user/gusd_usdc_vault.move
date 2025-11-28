@@ -9,7 +9,7 @@ use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::tx_context::sender;
-use test_coin::usdc::USDC;
+use usdc::usdc::USDC;
 
 // Error codes
 const E_INSUFFICIENT_BALANCE: u64 = 1;
