@@ -8,6 +8,7 @@ use protocol::error;
 use protocol::market::{Self, Market};
 use protocol::obligation::{Self, Obligation};
 use protocol::version::{Self, Version};
+use std::fixed_point32;
 use std::type_name::{Self, TypeName};
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
@@ -60,21 +61,22 @@ public fun repay(
     obligation::accrue_interests_and_rewards(obligation, market);
 
     // If the given coin is more than the debt, repay the debt only
-    let (debt_amount, _) = obligation::debt(obligation, coin_type);
+    let (debt_amount, _, debt_interest) = obligation::debt(obligation, coin_type);
 
     assert!(debt_amount > 0, error::no_debt_error());
-    
+
     let repay_amount = math::min(debt_amount, coin::value(&user_coin));
     let repay_coin = coin::split<COIN_GUSD>(&mut user_coin, repay_amount, ctx);
 
     // Put the repay asset into market
-    market::handle_repay<COIN_GUSD>(market, repay_coin, ctx);
+    market::handle_repay<COIN_GUSD>(market, repay_coin, debt_interest, ctx);
 
     // Decrease repay amount to the outflow limiter
     market::handle_inflow<COIN_GUSD>(market, repay_amount, now);
 
     // Decrease debt of the obligation according to repay amount
     obligation::decrease_debt(obligation, coin_type, repay_amount);
+    obligation::decrease_debt_interest(obligation, coin_type, math::min(debt_interest, repay_amount));
 
     // Transfer the remaining asset back to the sender if any
     if (coin::value(&user_coin) == 0) {

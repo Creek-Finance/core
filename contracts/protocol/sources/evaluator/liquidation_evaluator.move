@@ -92,21 +92,21 @@ public fun max_liquidation_amounts<DebtType, CollateralType>(
         x_oracle,
         clock,
     );
-    let weighted_debts_value = debts_value_usd(
+    let debts_value = debts_value_usd(
         obligation,
         coin_decimals_registry,
         x_oracle,
         clock,
     );
 
-    // when collaterals_value >= weighted_debts_value, the obligation is not liquidatable
-    if (!fixed_point32_empower::gt(weighted_debts_value, collaterals_value)) {
+    // when collaterals_value >= debts_value, the obligation is not liquidatable
+    if (!fixed_point32_empower::gt(debts_value, collaterals_value)) {
         return (0, 0)
     };
 
-    // max_liq_value = (weighted_debts_value - collaterals_value) / ((1 - liq_penalty) - liq_factor)
+    // max_liq_value = (debts_value - collaterals_value) / ((1 - liq_penalty) - liq_factor)
     let max_liq_value = fixed_point32_empower::div(
-        fixed_point32_empower::sub(weighted_debts_value, collaterals_value),
+        fixed_point32_empower::sub(debts_value, collaterals_value),
         fixed_point32_empower::sub(
             fixed_point32_empower::sub(
                 fixed_point32_empower::from_u64(1),
@@ -135,7 +135,7 @@ public fun max_liquidation_amounts<DebtType, CollateralType>(
     let max_repay_amount = fixed_point32::divide_u64(max_liq_amount, liq_exchange_rate);
 
     // max_repay_amount = min(max_repay_amount, total_debt_amount)
-    let (total_debt_amount, _) = obligation::debt(obligation, debt_type);
+    let (total_debt_amount, _, _) = obligation::debt(obligation, debt_type);
 
     let (max_repay_amount, max_liq_amount) = if (max_repay_amount <= total_debt_amount) {
         (max_repay_amount, max_liq_amount)

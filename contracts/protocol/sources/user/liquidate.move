@@ -11,12 +11,13 @@ use protocol::market::{Self, Market};
 use protocol::obligation::{Self, Obligation};
 use protocol::price;
 use protocol::version::{Self, Version};
-use std::fixed_point32::FixedPoint32;
+use std::fixed_point32::{Self, FixedPoint32};
 use std::type_name::{Self, TypeName};
 use sui::balance;
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::event::emit;
+use sui::math;
 use x_oracle::x_oracle::XOracle;
 
 public struct LiquidateEvent has copy, drop {
@@ -70,10 +71,11 @@ public fun liquidate<CollateralType>(
     ctx: &mut TxContext,
 ): (Coin<COIN_GUSD>, Coin<CollateralType>) {
     version::assert_current_version(version);
+    let coin_type = type_name::get<COIN_GUSD>();
 
     assert!(obligation::liquidate_locked(obligation) == false, error::obligation_locked());
     assert!(coin::value(&available_repay_coin) > 0, error::zero_amount_error());
-    
+
     let mut available_repay_balance = coin::into_balance(available_repay_coin);
     let now = clock::timestamp_ms(clock) / 1000;
 
@@ -97,8 +99,15 @@ public fun liquidate<CollateralType>(
         liq_amount,
     );
 
+    let (_, _, debt_interest) = obligation::debt(obligation, coin_type);
+
     // decrease debt from obligation
     obligation::decrease_debt(obligation, type_name::get<COIN_GUSD>(), repay_on_behalf);
+    obligation::decrease_debt_interest(
+        obligation,
+        type_name::get<COIN_GUSD>(),
+        math::min(debt_interest, repay_on_behalf),
+    );
 
     // handle liquidation in market & reserve
     let repay_on_behalf_balance = balance::split(&mut available_repay_balance, repay_on_behalf);
@@ -109,6 +118,7 @@ public fun liquidate<CollateralType>(
         repay_on_behalf_balance,
         revenue_balance,
         liq_amount,
+        debt_interest,
         ctx,
     );
 

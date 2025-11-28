@@ -152,7 +152,11 @@ public(package) fun decrease_debt(self: &mut Obligation, type_name: TypeName, am
     obligation_debts::decrease(&mut self.debts, type_name, amount);
 }
 
-public fun debt(self: &Obligation, type_name: TypeName): (u64, u64) {
+public(package) fun decrease_debt_interest(self: &mut Obligation, type_name: TypeName, amount: u64) {
+    obligation_debts::decrease_interest(&mut self.debts, type_name, amount);
+}
+
+public fun debt(self: &Obligation, type_name: TypeName): (u64, u64, u64) {
     obligation_debts::debt(&self.debts, type_name)
 }
 
