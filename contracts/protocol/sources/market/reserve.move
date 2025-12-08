@@ -111,7 +111,7 @@ public(package) fun handle_repay<T>(
     };
     let debt_to_burn = debt_amount - debt_interest;
 
-    if (debt_to_burn <= 0) {
+    if (debt_to_burn == 0) {
         // all repay amount is interest
         balance_bag::join(&mut self.revenue_balances, balance);
         return balance::zero<COIN_GUSD>()
@@ -151,6 +151,7 @@ public(package) fun handle_liquidation<T>(
 
     // calculate total amount
     let total_amount = balance::value(&repay_balance) + balance::value(&revenue_balance);
+    let reb = balance::value(&revenue_balance);
 
     // calculate how much debt and interest to keep
     let debt_amount = if (balance_sheet.debt >= total_amount) {
@@ -158,20 +159,34 @@ public(package) fun handle_liquidation<T>(
     } else {
         balance_sheet.debt
     };
+
     let interest_to_keep = total_amount - debt_amount;
 
-    // update balance sheet
-    balance_sheet.debt = balance_sheet.debt - debt_amount;
     if (interest_to_keep > 0) {
         balance_sheet.revenue = balance_sheet.revenue + interest_to_keep;
     };
+
+    // update balance sheet
+    if (balance_sheet.debt >= debt_amount) {
+        balance_sheet.debt = balance_sheet.debt - debt_amount;
+    } else {
+        balance_sheet.debt = 0;
+    };
+
     // combine repay_balance and revenue_balance
     balance::join(&mut repay_balance, revenue_balance);
 
-    let debt_to_burn = debt_amount - repay_interest;
+    let repay_interest_and_revenue = repay_interest + reb;
 
-    if (debt_to_burn <= 0) {
+    let debt_to_burn = if (debt_amount > repay_interest_and_revenue) {
+        debt_amount - repay_interest_and_revenue
+    } else {
+        0
+    };
+
+    if (debt_to_burn == 0) {
         // all repay amount is interest
+        balance_sheet.revenue = balance_sheet.revenue + reb;
         balance_bag::join(&mut self.revenue_balances, repay_balance);
         return balance::zero<T>()
     };
@@ -181,6 +196,7 @@ public(package) fun handle_liquidation<T>(
 
     // The remaining balance (interest_to_keep) goes to revenue_balances
     if (balance::value(&repay_balance) > 0) {
+        balance_sheet.revenue = balance_sheet.revenue + reb;
         balance_bag::join(&mut self.revenue_balances, repay_balance);
     } else {
         balance::destroy_zero(repay_balance);
