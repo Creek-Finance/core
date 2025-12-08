@@ -122,6 +122,31 @@ public(package) fun create_risk_model_change<T>(
         error::risk_model_param_error(),
     );
 
+    // Make sure (liquidation_factor - collateral_factor) > (liquidation_penalty + liquidation_discount)
+    let liquidation_factor_minus_collateral = fixed_point32_empower::sub(
+        liquidation_factor,
+        collateral_factor,
+    );
+    let liquidation_penalty_plus_discount = fixed_point32_empower::add(
+        liquidation_penalty,
+        liquidation_discount,
+    );
+    assert!(
+        fixed_point32_empower::gt(
+            liquidation_factor_minus_collateral,
+            liquidation_penalty_plus_discount,
+        ),
+        error::risk_model_param_error(),
+    );
+
+    // Make sure 1 - liquidation_penalty > liquidation_factor
+    let one = fixed_point32_empower::from_u64(1);
+    let one_minus_penalty = fixed_point32_empower::sub(one, liquidation_penalty);
+    assert!(
+        fixed_point32_empower::gt(one_minus_penalty, liquidation_factor),
+        error::risk_model_param_error(),
+    );
+
     let liquidation_revenue_factor = fixed_point32_empower::sub(
         liquidation_penalty,
         liquidation_discount,
