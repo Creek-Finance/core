@@ -93,27 +93,27 @@ public fun mint_gusd(
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
-    // check if version is supported
     version::assert_current_version(version);
-
     assert!(!market::is_paused(market), E_IS_PAUSED);
 
-    let amount = coin::value(&usdc);
-    assert!(amount > 0, E_INVALID_AMOUNT);
+    let amount_usdc = coin::value(&usdc);
+    assert!(amount_usdc > 0, E_INVALID_AMOUNT);
 
     let now = clock::timestamp_ms(clock) / 1000;
 
-    // Deposit USDC into vault
+    // deposit USDC into vault
     balance::join(&mut vault.usdc_balance, coin::into_balance(usdc));
 
-    // Call Market::mint_gusd
-    let gusd = market::mint_gusd(market, amount, now, ctx);
+    // convert precision: USDC(6) → GUSD(9)
+    let amount_gusd = amount_usdc * 1000;
+
+    // mint GUSD with 9 decimals
+    let gusd = market::mint_gusd(market, amount_gusd, now, ctx);
     transfer::public_transfer(gusd, sender(ctx));
 
-    // Emit mint event
     event::emit(MintEvent {
         user: sender(ctx),
-        amount,
+        amount: amount_gusd,
     });
 }
 
@@ -125,46 +125,48 @@ public fun redeem_gusd(
     gusd: Coin<COIN_GUSD>,
     ctx: &mut TxContext,
 ) {
-    // check if version is supported
     version::assert_current_version(version);
-
     assert!(!market::is_paused(market), E_IS_PAUSED);
-    let amount = coin::value(&gusd);
-    assert!(amount > 0, E_INVALID_AMOUNT);
 
-    // Check if vault has enough USDC
-    let available_usdc = balance::value(&vault.usdc_balance);
-    assert!(available_usdc >= amount, E_INSUFFICIENT_BALANCE);
+    let amount_gusd = coin::value(&gusd); // 9 decimals
+    assert!(amount_gusd > 0, E_INVALID_AMOUNT);
 
-    let numerator = (amount as u128) * (vault.fee_rate as u128);
+    // convert precision: GUSD(9) → USDC(6)
+    let amount_usdc_before_fee = amount_gusd / 1000;
+
+    // check vault balance
+    let available = balance::value(&vault.usdc_balance);
+    assert!(available >= amount_usdc_before_fee, E_INSUFFICIENT_BALANCE);
+
+    // fee calculation (USDC unit)
+    let numerator = (amount_usdc_before_fee as u128) * (vault.fee_rate as u128);
     let fee128 = (numerator + 10000 - 1) / 10000;
     assert!(fee128 <= U64_MAX, E_OVERFLOW);
-    let fee = (fee128 as u64);
+    let fee = fee128 as u64;
 
-    assert!(fee < amount, E_INVALID_FEE);
+    assert!(fee < amount_usdc_before_fee, E_INVALID_FEE);
 
-    let redeem_amount = amount - fee;
+    let redeem_amount = amount_usdc_before_fee - fee;
 
-    // Burn GUSD in Market
+    // burn original GUSD
     market::burn_gusd(market, gusd, ctx);
 
-    // Transfer USDC back to user
+    // transfer USDC to user
     let redeem_balance = balance::split(&mut vault.usdc_balance, redeem_amount);
     let redeem_coin = coin::from_balance(redeem_balance, ctx);
     transfer::public_transfer(redeem_coin, sender(ctx));
 
-    // Transfer fee to team address
+    // fee to team
     if (fee > 0) {
         let fee_balance = balance::split(&mut vault.usdc_balance, fee);
         let fee_coin = coin::from_balance(fee_balance, ctx);
         transfer::public_transfer(fee_coin, vault.team_address);
     };
 
-    // Emit redeem event
     event::emit(RedeemEvent {
         user: sender(ctx),
-        gusd_amount: amount, // original GUSD sent by user
-        redeemed_usdc: redeem_amount, // amount of USDC user receives
+        gusd_amount: amount_gusd,
+        redeemed_usdc: redeem_amount,
         fee,
     });
 }
