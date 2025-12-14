@@ -133,6 +133,8 @@ public fun redeem_gusd(
 
     // convert precision: GUSD(9) → USDC(6)
     let amount_usdc_before_fee = amount_gusd / 1000;
+    
+    assert!(amount_usdc_before_fee > 0, E_INVALID_AMOUNT);
 
     // check vault balance
     let available = balance::value(&vault.usdc_balance);
