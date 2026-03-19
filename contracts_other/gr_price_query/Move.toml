@@ -1,0 +1,11 @@
+[package]
+name = "gr_price_query"
+edition = "2024"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "d75fae3aa7fa3545b5803980a1e0c965b8bbf48e" }
+XOracle = { local = "../../contracts/sui_x_oracle/x_oracle" }
+
+[addresses]
+gr_price_query = "0x0"
+

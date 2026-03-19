@@ -2,27 +2,26 @@
 
 [move]
 version = 3
-
+manifest_digest = "6541551F453508C2328C9B9EAE166B2BA57BBA46FB65BF39A65BFCF4C33D3C49"
+deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
 dependencies = [
   { id = "Sui", name = "Sui" },
 ]
-manifest_digest = "129DEDE387DD3C1E8E3AD4A6F8AEF96C74F545CEA484F36AFF9A776BD117D025"
-deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
 
 [[move.package]]
 id = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet", subdir = "crates/sui-framework/packages/move-stdlib" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "mainnet", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 id = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet", subdir = "crates/sui-framework/packages/sui-framework" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "mainnet", subdir = "crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
 ]
 
 [move.toolchain-version]
-compiler-version = "1.57.0"
+compiler-version = "1.60.0"
 edition = "2024"
 flavor = "sui"
 
@@ -30,8 +29,8 @@ flavor = "sui"
 
 [env.testnet]
 chain-id = "4c78adac"
-original-published-id = "0x927a5ed0f414ef78c5bf6a5b6048b7237c5e075d6fcf03d817edb7e61bcba073"
-latest-published-id = "0x927a5ed0f414ef78c5bf6a5b6048b7237c5e075d6fcf03d817edb7e61bcba073"
+original-published-id = "0x5e98f904ecf4a411848934104d5910f462e5edb7d4172462a0093123438c958a"
+latest-published-id = "0x5e98f904ecf4a411848934104d5910f462e5edb7d4172462a0093123438c958a"
 published-version = "1"
 
 [env.localnet]
@@ -40,8 +39,8 @@ original-published-id = "0x6e7d4ee9e167c3e03778ce3843d1a52550014517a2af5c8ec92de
 latest-published-id = "0x6e7d4ee9e167c3e03778ce3843d1a52550014517a2af5c8ec92de5bdd38b055d"
 published-version = "1"
 
-[env.local]
-chain-id = "0bf2c56e"
-original-published-id = "0x870056723bdb71b7e67a05c5f40067d0426fce462005a3a746726bf4c966f1bc"
-latest-published-id = "0x870056723bdb71b7e67a05c5f40067d0426fce462005a3a746726bf4c966f1bc"
+[env.mainnet]
+chain-id = "35834a8a"
+original-published-id = "0xbf0ff2c916bccc759793a14cbd121f495f53f6121d8b5fd41c836a8ad8253d7c"
+latest-published-id = "0xbf0ff2c916bccc759793a14cbd121f495f53f6121d8b5fd41c836a8ad8253d7c"
 published-version = "1"

@@ -227,3 +227,6 @@ module xaum_indicator_core::xaum_indicator_core_test {
     }
 
 }
+
+
+

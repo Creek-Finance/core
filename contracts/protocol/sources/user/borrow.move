@@ -153,16 +153,10 @@ fun borrow_internal(
 
     let new_total_global_debt = (current_total_global_debt as u128) + (borrow_amount as u128);
 
-    assert!(
-        new_total_global_debt <= borrow_limit,
-        error::borrow_limit_reached_error(),
-    );
+    assert!(new_total_global_debt <= borrow_limit, error::borrow_limit_reached_error());
 
     // Add borrow amount to the outflow limiter, if limit is reached then abort
     market::handle_outflow<COIN_GUSD>(market, borrow_amount, now);
-
-    // Call mint_gusd to get Coin<COIN_GUSD>
-    let mut borrowed_coin = market::handle_borrow(market, borrow_amount, now, ctx);
 
     // init debt if borrow for the first time
     obligation::init_debt(obligation, market, coin_type);
@@ -202,6 +196,9 @@ fun borrow_internal(
         math::fixed_point32_empower::gt(collaterals_value, debts_value),
         error::borrow_too_much_error(),
     );
+
+    // Call mint_gusd to get Coin<COIN_GUSD>
+    let mut borrowed_coin = market::handle_borrow(market, borrow_amount, now, ctx);
 
     // Split the borrow fee from borrowed coin
     let final_borrow_fee = coin::split(&mut borrowed_coin, base_borrow_fee_amount, ctx);

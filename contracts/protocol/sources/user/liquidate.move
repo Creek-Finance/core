@@ -102,12 +102,15 @@ public fun liquidate<CollateralType>(
     let (_, _, debt_interest) = obligation::debt(obligation, coin_type);
 
     // decrease debt from obligation
+    if (debt_interest > 0) {
+        obligation::decrease_debt_interest(
+            obligation,
+            type_name::get<COIN_GUSD>(),
+            math::min(debt_interest, repay_on_behalf),
+        );
+    };
+
     obligation::decrease_debt(obligation, type_name::get<COIN_GUSD>(), repay_on_behalf);
-    obligation::decrease_debt_interest(
-        obligation,
-        type_name::get<COIN_GUSD>(),
-        math::min(debt_interest, repay_on_behalf),
-    );
 
     // handle liquidation in market & reserve
     let repay_on_behalf_balance = balance::split(&mut available_repay_balance, repay_on_behalf);

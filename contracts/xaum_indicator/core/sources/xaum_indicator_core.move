@@ -261,3 +261,5 @@ module xaum_indicator_core::xaum_indicator_core {
     // Helper for adapters to validate storage asset type
     public fun get_asset_type(storage: &PriceStorage): TypeName { storage.asset_type }
 }
+
+

@@ -75,8 +75,15 @@ public fun repay(
     market::handle_inflow<COIN_GUSD>(market, repay_amount, now);
 
     // Decrease debt of the obligation according to repay amount
+    if (debt_interest > 0) {
+        obligation::decrease_debt_interest(
+            obligation,
+            coin_type,
+            math::min(debt_interest, repay_amount),
+        );
+    };
+
     obligation::decrease_debt(obligation, coin_type, repay_amount);
-    obligation::decrease_debt_interest(obligation, coin_type, math::min(debt_interest, repay_amount));
 
     // Transfer the remaining asset back to the sender if any
     if (coin::value(&user_coin) == 0) {

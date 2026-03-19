@@ -84,3 +84,5 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
 
     // No extra types needed
 }
+
+

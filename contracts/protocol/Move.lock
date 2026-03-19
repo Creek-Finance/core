@@ -2,21 +2,20 @@
 
 [move]
 version = 3
-manifest_digest = "B1E4E1BCEEA03D8DE0CB49F710868BE9513590C2D44E57EF61411ADB3D215036"
-deps_digest = "8D8E72BAA06E63572166CA7E7F6E159CA2D11E27ADE3961B15E29922A04B0D32"
+manifest_digest = "B39948AEA80C667B70C0C6A953592CFEA84AF262E3A9DBB04A90C9926049A12B"
+deps_digest = "D7FB1F2E1A893B9A0E80A392473710373DE5791D3AC8F6D898803754B2ADAE6B"
 dependencies = [
-  { id = "Bridge", name = "Bridge" },
   { id = "CoinDecimalsRegistry", name = "CoinDecimalsRegistry" },
   { id = "Math", name = "Math" },
   { id = "MoveStdlib", name = "MoveStdlib" },
   { id = "Sui", name = "Sui" },
-  { id = "SuiSystem", name = "SuiSystem" },
-  { id = "TestCoin", name = "TestCoin" },
   { id = "X", name = "X" },
   { id = "XOracle", name = "XOracle" },
   { id = "coin_gr", name = "coin_gr" },
   { id = "coin_gusd", name = "coin_gusd" },
   { id = "coin_gy", name = "coin_gy" },
+  { id = "usdc", name = "usdc" },
+  { id = "xaum", name = "xaum" },
 ]
 
 [[move.package]]
@@ -47,11 +46,11 @@ dependencies = [
 
 [[move.package]]
 id = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "b448b1d971bd6c1aac8ef4eee4305943806d5d5b", subdir = "crates/sui-framework/packages/move-stdlib" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "mainnet-v1.60.1", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 id = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "b448b1d971bd6c1aac8ef4eee4305943806d5d5b", subdir = "crates/sui-framework/packages/sui-framework" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "mainnet-v1.60.1", subdir = "crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
@@ -63,14 +62,6 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "b448b1d971bd6c1
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
-  { id = "Sui", name = "Sui" },
-]
-
-[[move.package]]
-id = "TestCoin"
-source = { local = "../../contracts_other/test_coin" }
-
-dependencies = [
   { id = "Sui", name = "Sui" },
 ]
 
@@ -114,8 +105,58 @@ dependencies = [
   { id = "Sui", name = "Sui" },
 ]
 
+[[move.package]]
+id = "mtoken"
+source = { git = "https://github.com/Matrixdock-RWA/RWA-Contracts.git", rev = "sui_verify", subdir = "xaum-sui/packages/mtoken" }
+
+dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+]
+
+[[move.package]]
+id = "stablecoin"
+source = { git = "https://github.com/circlefin/stablecoin-sui.git", rev = "master", subdir = "packages/stablecoin" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+  { id = "sui_extensions", name = "sui_extensions" },
+]
+
+[[move.package]]
+id = "sui_extensions"
+source = { git = "https://github.com/circlefin/stablecoin-sui.git", rev = "master", subdir = "packages/sui_extensions" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+]
+
+[[move.package]]
+id = "usdc"
+source = { git = "https://github.com/circlefin/stablecoin-sui.git", rev = "master", subdir = "packages/usdc" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+  { id = "stablecoin", name = "stablecoin" },
+  { id = "sui_extensions", name = "sui_extensions" },
+]
+
+[[move.package]]
+id = "xaum"
+source = { git = "https://github.com/Matrixdock-RWA/RWA-Contracts.git", rev = "sui_verify", subdir = "xaum-sui/packages/xaum" }
+
+dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+  { id = "mtoken", name = "mtoken" },
+]
+
 [move.toolchain-version]
-compiler-version = "1.53.2"
+compiler-version = "1.60.0"
 edition = "2024"
 flavor = "sui"
 
@@ -123,18 +164,18 @@ flavor = "sui"
 
 [env.testnet]
 chain-id = "4c78adac"
-original-published-id = "0x49901c395f4052c3b966d6e7ee0e133adde864d43d2e586d6763e9c76905b9a2"
-latest-published-id = "0x49901c395f4052c3b966d6e7ee0e133adde864d43d2e586d6763e9c76905b9a2"
-published-version = "1"
-
-[env.localnet]
-chain-id = "5eced198"
-original-published-id = "0xd72a912ba44a72c4e7c26431240a7c0c9506f6efa04ab5b23beb75c14703127b"
-latest-published-id = "0xd72a912ba44a72c4e7c26431240a7c0c9506f6efa04ab5b23beb75c14703127b"
+original-published-id = "0x6fdce31e773bb9ada3d0ca5ac9cd61ae3b05d098cfd6abe2288f3ef2c2a7deb6"
+latest-published-id = "0x6fdce31e773bb9ada3d0ca5ac9cd61ae3b05d098cfd6abe2288f3ef2c2a7deb6"
 published-version = "1"
 
 [env.local]
-chain-id = "0bf2c56e"
-original-published-id = "0xf39860e993f25c360c8422932965d523f13e507700bb6f1b0e3f2846d898a70a"
-latest-published-id = "0xf39860e993f25c360c8422932965d523f13e507700bb6f1b0e3f2846d898a70a"
+chain-id = "34435b50"
+original-published-id = "0x83c17747dccb11eda874dbfb21673bf7f5856ec621a74b026f8ddda5a4ef1268"
+latest-published-id = "0x83c17747dccb11eda874dbfb21673bf7f5856ec621a74b026f8ddda5a4ef1268"
+published-version = "1"
+
+[env.mainnet]
+chain-id = "35834a8a"
+original-published-id = "0x7ac3d8f55df5472a7f5e57da7e84f61a3f091fc1a912e140d347c0d7bf954d1d"
+latest-published-id = "0x7ac3d8f55df5472a7f5e57da7e84f61a3f091fc1a912e140d347c0d7bf954d1d"
 published-version = "1"

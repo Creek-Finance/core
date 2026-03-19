@@ -1,0 +1,12 @@
+[package]
+edition = "2024.beta"
+name = "Creek_Router"
+version = "0.0.1"
+
+[dependencies]
+mmt_v3 = { git = "https://github.com/mmt-finance/mmt-contract-interface.git", subdir = "mmt_v3", rev = "7771e4eda39eed10f9fe32065d2eb54e5638c162" }
+Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "3bd1262dcba9518a6901aa6a15f04072799bfb37" }
+swap_pool = {git = "https://github.com/Matrixdock-RWA/RWA-Contracts.git", subdir = "xaum-sui/packages/swap_pool", rev = "e82eceedfecab7607f20ac1a520c62a801312dc7", override = true}
+
+[addresses]
+creek_router = "0x0"

@@ -1,0 +1,22 @@
+[package]
+edition = "2024"
+name="ProtocolTest"
+version="0.0.1"
+
+[dependencies.MoveStdlib]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/move-stdlib"
+rev = "testnet"
+
+[dependencies.Sui]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+rev = "testnet"
+
+[dependencies.Creek]
+local = "../../contracts/protocol"
+coin_gusd = { local = "../../contracts/coins/coin_gusd" }
+
+[addresses]
+protocol_test="0x0"
+std = "0x1"

@@ -1,0 +1,16 @@
+[package]
+name = "mtoken"
+edition = "2024.beta"
+license = "GPL-3.0"
+authors = ["mprwa-dev@matrixport.com"]
+version = "0.1.0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }
+
+[addresses]
+mtoken = "0x0"
+
+[dev-dependencies]
+
+[dev-addresses]

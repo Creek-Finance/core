@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-SupraOracle = { git = "https://github.com/Entropy-Foundation/dora-interface", subdir = "sui/testnet/supra_holder", rev = "testnet" }
+SupraOracle = { git = "https://github.com/Entropy-Foundation/dora-interface", subdir = "sui/mainnet/supra_holder", rev = "mainnet" }
 XOracle = {local = "../x_oracle"}
 
 

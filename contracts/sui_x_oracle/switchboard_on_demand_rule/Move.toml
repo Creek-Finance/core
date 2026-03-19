@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-Switchboard = {git = "https://github.com/switchboard-xyz/sui.git", subdir = "on_demand", rev = "testnet"}
+Switchboard = {git = "https://github.com/switchboard-xyz/sui.git", subdir = "on_demand", rev = "mainnet"}
 XOracle = {local = "../x_oracle"}
 
 [addresses]

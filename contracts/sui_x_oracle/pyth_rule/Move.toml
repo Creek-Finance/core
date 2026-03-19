@@ -2,11 +2,10 @@
 name = "PythRule"
 version = "0.0.1"
 edition = "2024"
-published-at = "0x1cf913c825c202cbbb71c378edccb9c04723fa07a73b88677b2ef89c6e203a85"
 
 [dependencies]
-Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "sui-contract-testnet" }
+Pyth = { git = "https://github.com/pyth-network/pyth-crosschain.git", subdir = "target_chains/sui/contracts", rev = "sui-contract-mainnet" }
 XOracle = { local = "../x_oracle" }
 
 [addresses]
-pyth_rule = "0x1cf913c825c202cbbb71c378edccb9c04723fa07a73b88677b2ef89c6e203a85"
+pyth_rule = "0x0"
