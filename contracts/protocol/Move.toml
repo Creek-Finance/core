@@ -15,7 +15,6 @@ coin_gusd = { local = "../coins/coin_gusd" }
 # Use lowercase xaum/usdc to match official mainnet package names
 # For mainnet: git references to official repos with published-at
 # For testnet/local: local vendor packages with test_mint support
-xaum = { git = "https://github.com/Matrixdock-RWA/RWA-Contracts.git", subdir = "xaum-sui/packages/xaum", rev = "sui_verify" }
 usdc = { git = "https://github.com/circlefin/stablecoin-sui.git", subdir = "packages/usdc", rev = "master" }
 Math = { local = "../libs/math" }
 X = { local = "../libs/x" }
@@ -24,3 +23,4 @@ XOracle = { local = "../sui_x_oracle/x_oracle" }
 
 [addresses]
 protocol = "0x0"
+xaum = "0x22aca8f8358ac1de0ae9f4a8da541480e1b5d5d0fc258d625014514672eb6c3f"
