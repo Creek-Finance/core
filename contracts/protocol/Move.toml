@@ -15,6 +15,7 @@ coin_gusd = { local = "../coins/coin_gusd" }
 # Use lowercase xaum/usdc to match official mainnet package names
 # For mainnet: git references to official repos with published-at
 # For testnet/local: local vendor packages with test_mint support
+xaum = { local = "../../contracts_other/vendor/xaum/packages/xaum"}
 usdc = { git = "https://github.com/circlefin/stablecoin-sui.git", subdir = "packages/usdc", rev = "master" }
 Math = { local = "../libs/math" }
 X = { local = "../libs/x" }

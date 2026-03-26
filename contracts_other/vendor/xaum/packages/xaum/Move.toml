@@ -2,13 +2,13 @@
 name = "xaum"
 edition = "2024.beta"
 
-published-at = "0x9d297676e7a4b771ab023291377b2adfaa4938fb9080b8d12430e4b108b836a9"
+published-at = "0x22aca8f8358ac1de0ae9f4a8da541480e1b5d5d0fc258d625014514672eb6c3f"
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }
 mtoken = { local = "../mtoken" }
 
 [addresses]
-xaum = "0x9d297676e7a4b771ab023291377b2adfaa4938fb9080b8d12430e4b108b836a9"
+xaum = "0x22aca8f8358ac1de0ae9f4a8da541480e1b5d5d0fc258d625014514672eb6c3f"
 
 [dev-dependencies]
 
