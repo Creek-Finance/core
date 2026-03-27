@@ -6,8 +6,9 @@ authors = ["mprwa-dev@matrixport.com"]
 version = "0.1.0"
 
 published-at = "0x1983acb638e7395f18e0c42c832c93dabadf9da837fca28a3142ba06cdd3c23c"
+
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet-v1.60.1" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }
 
 [addresses]
 mtoken = "0x1983acb638e7395f18e0c42c832c93dabadf9da837fca28a3142ba06cdd3c23c"

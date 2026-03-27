@@ -18,6 +18,7 @@
 name = "stablecoin"
 edition = "2024.beta"
 license = "Apache 2.0"
+published-at = "0xe8111b0eb2fe1b0fd7569102119a001dd333ba6d0cf1a501a030f75c1dc20206"
 
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
@@ -28,8 +29,8 @@ rev = "testnet"
 local = "../sui_extensions"
 
 [addresses]
-sui_extensions = "0x0"
-stablecoin = "0x0"
+sui_extensions = "0x03bcec3e0e2790cd9154b29ec7366f8bffaab0122d919c0511dc8be1d0144bad"
+stablecoin = "0xe8111b0eb2fe1b0fd7569102119a001dd333ba6d0cf1a501a030f75c1dc20206"
 
 [dev-dependencies]
 

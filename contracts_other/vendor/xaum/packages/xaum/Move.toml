@@ -4,7 +4,7 @@ edition = "2024.beta"
 
 published-at = "0x22aca8f8358ac1de0ae9f4a8da541480e1b5d5d0fc258d625014514672eb6c3f"
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet-v1.60.1"}
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }
 mtoken = { local = "../mtoken" }
 
 [addresses]

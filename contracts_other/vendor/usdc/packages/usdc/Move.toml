@@ -19,7 +19,7 @@ name = "usdc"
 edition = "2024.beta"
 license = "Apache 2.0"
 
-published-at = "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7"
+published-at = "0x8d71e0531c5516114b0d8d80f5fe6de2195087471c99afae836ace26e4f6a0b2"
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
@@ -29,9 +29,9 @@ rev = "testnet"
 local = "../stablecoin"
 
 [addresses]
-sui_extensions = "0x0"
-stablecoin = "0x0"
-usdc = "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7"
+sui_extensions = "0x03bcec3e0e2790cd9154b29ec7366f8bffaab0122d919c0511dc8be1d0144bad"
+stablecoin = "0xe8111b0eb2fe1b0fd7569102119a001dd333ba6d0cf1a501a030f75c1dc20206"
+usdc = "0x8d71e0531c5516114b0d8d80f5fe6de2195087471c99afae836ace26e4f6a0b2"
 
 [dev-dependencies]
 
