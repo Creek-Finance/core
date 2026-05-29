@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "146836F095E311954D6CD9C812E897DE83BB5A631F01C428D1100BCB2B5C08A3"
+manifest_digest = "B39948AEA80C667B70C0C6A953592CFEA84AF262E3A9DBB04A90C9926049A12B"
 deps_digest = "D7FB1F2E1A893B9A0E80A392473710373DE5791D3AC8F6D898803754B2ADAE6B"
 dependencies = [
   { id = "CoinDecimalsRegistry", name = "CoinDecimalsRegistry" },
@@ -16,6 +16,16 @@ dependencies = [
   { id = "coin_gy", name = "coin_gy" },
   { id = "usdc", name = "usdc" },
   { id = "xaum", name = "xaum" },
+]
+
+[[move.package]]
+id = "Bridge"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "b448b1d971bd6c1aac8ef4eee4305943806d5d5b", subdir = "crates/sui-framework/packages/bridge" }
+
+dependencies = [
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
 ]
 
 [[move.package]]
@@ -44,6 +54,15 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "mainnet-v1.60.1
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
+]
+
+[[move.package]]
+id = "SuiSystem"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "b448b1d971bd6c1aac8ef4eee4305943806d5d5b", subdir = "crates/sui-framework/packages/sui-system" }
+
+dependencies = [
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
 ]
 
 [[move.package]]
@@ -88,10 +107,13 @@ dependencies = [
 
 [[move.package]]
 id = "mtoken"
-source = { local = "../../contracts_other/vendor/xaum/packages/mtoken" }
+source = { git = "https://github.com/Matrixdock-RWA/RWA-Contracts.git", rev = "sui_verify", subdir = "xaum-sui/packages/mtoken" }
 
 dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
   { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
 ]
 
 [[move.package]]
@@ -123,15 +145,18 @@ dependencies = [
 
 [[move.package]]
 id = "xaum"
-source = { local = "../../contracts_other/vendor/xaum/packages/xaum" }
+source = { git = "https://github.com/Matrixdock-RWA/RWA-Contracts.git", rev = "sui_verify", subdir = "xaum-sui/packages/xaum" }
 
 dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
   { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
   { id = "mtoken", name = "mtoken" },
 ]
 
 [move.toolchain-version]
-compiler-version = "1.60.0"
+compiler-version = "1.60.1"
 edition = "2024"
 flavor = "sui"
 
@@ -151,6 +176,6 @@ published-version = "1"
 
 [env.mainnet]
 chain-id = "35834a8a"
-original-published-id = "0x7ac3d8f55df5472a7f5e57da7e84f61a3f091fc1a912e140d347c0d7bf954d1d"
-latest-published-id = "0x7ac3d8f55df5472a7f5e57da7e84f61a3f091fc1a912e140d347c0d7bf954d1d"
+original-published-id = "0x5689c2dec9f0434ac283ee9f5fc84f6889a83caedd3507d2ba14b4d1a57117a2"
+latest-published-id = "0x5689c2dec9f0434ac283ee9f5fc84f6889a83caedd3507d2ba14b4d1a57117a2"
 published-version = "1"

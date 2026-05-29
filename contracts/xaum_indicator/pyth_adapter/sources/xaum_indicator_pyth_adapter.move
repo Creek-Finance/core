@@ -58,7 +58,7 @@ module xaum_indicator_pyth_adapter::xaum_indicator_pyth_adapter {
         if (!i64::get_is_negative(&expo) && expo_abs > 18) { return };
 
         let normalized = convert_price_to_u256(&p, &expo);
-        core::update_price_storage_external(storage, normalized);
+        core::update_price_storage_admin(storage, admin_cap, normalized);
 
         core::push_gr_indicators_to_x_oracle(storage, admin_cap, x_oracle, clock, _ctx);
     }

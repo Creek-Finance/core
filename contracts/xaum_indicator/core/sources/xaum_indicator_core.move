@@ -10,10 +10,20 @@ module xaum_indicator_core::xaum_indicator_core {
     use x_oracle::x_oracle::{Self as x_oracle_mod, XOracle, XOracleAdminCap};
 
     const E_NOT_ADMIN: u64 = 0x1;
+    const E_INVALID_SPOT: u64 = 0x2;
+    const E_VERSION_MISMATCH: u64 = 0x3;
+
+    /// Storage schema version. Bump in lock-step with any future in-place
+    /// upgrade that changes the meaning of existing fields, then guard the
+    /// affected entrypoints with `assert_current_version`.
+    const CURRENT_VERSION: u64 = 1;
 
     // Core storage and indicators; independent from Pyth adapter
     public struct PriceStorage has key, store {
         id: UID,
+        /// Storage schema version; admin-gated entrypoints assert
+        /// `version == CURRENT_VERSION` before mutating state.
+        version: u64,
         admin_cap_id: ID,
         asset_type: TypeName,
         // Optional bound Pyth price feed object id; set by adapter on non-local networks
@@ -44,6 +54,7 @@ module xaum_indicator_core::xaum_indicator_core {
     public fun create_price_storage(admin_cap_id: ID, ctx: &mut TxContext): PriceStorage {
         PriceStorage {
             id: object::new(ctx),
+            version: CURRENT_VERSION,
             admin_cap_id,
             asset_type: with_defining_ids<SUI>(),
             pyth_feed_id: option::none<ID>(),
@@ -84,16 +95,32 @@ module xaum_indicator_core::xaum_indicator_core {
         transfer::transfer(owner_cap, recipient);
     }
 
-    /// Owner override: mint a fresh AdminCap and assign to `new_admin`
+    /// Owner override: mint a fresh AdminCap and assign to `new_admin`.
+    /// Lets the OwnerCap holder rotate the keeper without re-publishing the
+    /// package or transferring the in-flight AdminCap back to the owner.
     public fun set_admin_cap(
         _owner_cap: &OwnerCap,
         storage: &mut PriceStorage,
         new_admin: address,
         ctx: &mut TxContext,
     ) {
+        assert_current_version(storage);
         let admin = create_admin_cap(ctx);
         storage.admin_cap_id = object::id(&admin);
         transfer::transfer(admin, new_admin);
+    }
+
+    /// Returns the package's compile-time storage schema version.
+    public fun current_version(): u64 { CURRENT_VERSION }
+
+    public fun storage_version(storage: &PriceStorage): u64 { storage.version }
+
+    public fun is_current_version(storage: &PriceStorage): bool {
+        storage.version == CURRENT_VERSION
+    }
+
+    public fun assert_current_version(storage: &PriceStorage) {
+        assert!(is_current_version(storage), E_VERSION_MISMATCH);
     }
 
     #[test_only]
@@ -110,6 +137,7 @@ module xaum_indicator_core::xaum_indicator_core {
     }
 
     public fun assert_admin(storage: &PriceStorage, admin_cap: &AdminCap) {
+        assert_current_version(storage);
         assert!(object::id(admin_cap) == storage.admin_cap_id, E_NOT_ADMIN);
     }
 
@@ -209,9 +237,18 @@ module xaum_indicator_core::xaum_indicator_core {
         if (len > 0) { storage.average_price = total / (len as u256); };
     }
 
-    // External update entrypoint for adapters
-    public fun update_price_storage_external(storage: &mut PriceStorage, new_price: u256) {
-        update_price_storage(storage, new_price)
+    /// Admin-gated update entrypoint for adapter packages.
+    ///
+    /// Requires the keeper's `AdminCap`, so only the admin path
+    /// (keeper hot wallet, rotatable via `set_admin_cap`) can mutate
+    /// `latest_price` / EMA state.
+    public fun update_price_storage_admin(
+        storage: &mut PriceStorage,
+        admin_cap: &AdminCap,
+        new_price: u256,
+    ) {
+        assert_admin(storage, admin_cap);
+        update_price_storage(storage, new_price);
     }
 
     // Feed binding helpers (used by adapter)
@@ -240,6 +277,7 @@ module xaum_indicator_core::xaum_indicator_core {
         let ema120_u64 = (ema120_u256 / 1000000000u256) as u64;
         let ema90_u64 = (ema90_u256 / 1000000000u256) as u64;
         let spot_u64 = (storage.latest_price / 1000000000u256) as u64;
+        assert!(spot_u64 > 0, E_INVALID_SPOT);
         let now = sui::clock::timestamp_ms(clock) / 1000;
         let admin_cap_ref = dynamic_object_field::borrow<AdminCapKey, XOracleAdminCap>(&storage.id, AdminCapKey {});
         x_oracle_mod::set_gr_indicators(x_oracle, admin_cap_ref, ema120_u64, ema90_u64, spot_u64, now, _ctx);

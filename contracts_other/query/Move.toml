@@ -4,7 +4,7 @@ version = "0.0.1"
 
 [dependencies]
 # Use single-line format so deploy-all can update rev automatically
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet" }
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "mainnet-v1.60.1" }
 Creek = { local = "../../contracts/protocol" }
 
 [addresses]
